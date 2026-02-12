@@ -27,6 +27,10 @@ venv/
 # Claude Code local settings (may contain credentials in permission rules)
 .claude/settings.local.json
 
+# Project data (credentials, client files, generated artifacts)
+projects/
+!projects/.gitkeep
+
 # Backups
 *.bak
 
