@@ -6,13 +6,13 @@ An AI-powered pre-sales assistant that lives in your terminal. Open Claude Code,
 
 ## How It Works
 
-Open your terminal in the project folder and start Claude Code:
+Open your terminal and type:
 
 ```bash
-claude
+presales
 ```
 
-Then just tell it what you want. Here are some real examples:
+This launches Claude Code in the pipeline folder with all instructions loaded automatically. Then just tell it what you want. Here are some real examples:
 
 ### Starting a new project
 
@@ -79,13 +79,27 @@ chmod +x presales
 pip install -r requirements-mcp.txt
 ```
 
-### 3. Start chatting
+### 3. Set up the `presales` alias
+
+Add this to your `~/.zshrc` (or `~/.bashrc`):
 
 ```bash
-claude
+alias presales="cd ~/Downloads/presales-pipeline && claude"
 ```
 
-That's it. Claude reads the `CLAUDE.md` instructions automatically and knows how the pipeline works. Credentials (ADO PAT) are configured per-project in `project.yaml` when you create a new project — Claude will ask you for them.
+Then reload your shell:
+
+```bash
+source ~/.zshrc
+```
+
+### 4. Start chatting
+
+```bash
+presales
+```
+
+That's it. This opens Claude Code in the pipeline folder with all instructions loaded automatically. Credentials (ADO PAT) are configured per-project in `project.yaml` when you create a new project — Claude will ask you for them.
 
 **Where to get your ADO PAT:** dev.azure.com → User Settings → Personal Access Tokens (needs Work Items read/write, Code read/write, Wiki read/write)
 
