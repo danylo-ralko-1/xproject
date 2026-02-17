@@ -39,3 +39,9 @@ projects/
 
 # External repos
 claude-talk-to-figma-mcp/
+
+# MCP local config (may contain credentials)
+.mcp.json
+
+# Next.js build cache
+.next/

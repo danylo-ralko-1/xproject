@@ -9,17 +9,22 @@ You are used by business analysts who may not be technical. Always be clear, pro
 **You (Claude Code) do all the thinking. Python scripts only handle data I/O.**
 
 The pipeline has two types of work:
-1. **Data gathering** — Python scripts parse files, call ADO/Figma APIs, export Excel. These are triggered with `python3 ~/Downloads/presales-pipeline/presales <command>`.
+1. **Data gathering** — Python scripts parse files, call ADO APIs, export Excel. These are triggered with `python3 ~/Downloads/presales-pipeline/presales <command>`.
 2. **Analysis & generation** — YOU do this directly in conversation. You read files, analyze requirements, generate stories, generate feature code. No Python script calls Claude.
 
 This means the pipeline runs entirely on the user's Claude subscription. No API key needed.
 
 ### Standard pipeline flow:
 ```
-Ingest requirements → Breakdown into stories → Push to ADO → Extract design system from Figma → Developers implement 2-3 reference stories → Scan codebase patterns → Generate feature code
+Ingest requirements → Breakdown into stories → Push to ADO + Generate product documentation → Generate feature code
 ```
 
-The design system step reads representative Figma screens to extract color tokens, typography, spacing, component patterns, and screen blueprints into `design-system.md`. After developers manually implement 2-3 reference stories, the codebase scan step extracts conventions into `codebase-patterns.md`. Both files are then used by the code generation step to produce UI code that matches both the design and the project's coding patterns.
+Optionally, at any point after code generation begins:
+```
+→ Scan existing codebase for patterns (optional, improves accuracy)
+```
+
+The pipeline uses a **shared design system** (`design-system.md` at the repo root). This is a pre-configured, comprehensive component catalog reused across all projects. If the target repository already has code, the optional codebase scan step extracts conventions into `codebase-patterns.md`. Both the shared design system and codebase patterns (when available) are then used by the code generation step to produce UI code that matches both the component library and the project's coding patterns.
 
 ### What Python scripts do (data I/O only):
 | Command | What it does |
@@ -37,16 +42,15 @@ The design system step reads representative Figma screens to extract color token
 | Discovery | Read requirements_context.md → generate overview.md + questions.txt | Local files |
 | Breakdown | Read overview + answers → generate breakdown.json | Local files |
 | Push AC | Generate user story text + detailed AC + technical context → write push_ready.json → then run push script | Local files (breakdown.json + overview + requirements) |
-| Extract design system | Read a few representative Figma screens via MCP → extract tokens and patterns → save design-system.md | Figma MCP |
-| Feature code | Fetch story from ADO → analyze target codebase + codebase-patterns.md + design-system.md → generate feature code + API contract → push branch → link in ADO | **ADO** + target codebase + codebase-patterns.md + design-system.md |
+| Product document | Fetch all ADO stories → generate product overview Wiki pages in ADO | **ADO** (source of truth) |
+| Feature code | Fetch story from ADO → analyze target codebase + codebase-patterns.md + shared design-system.md → generate feature code + API contract → push branch → link in ADO | **ADO** + target codebase + codebase-patterns.md + shared design-system.md (repo root) |
 
 **Invoked on request:**
 | Task | What you do | Data source |
 |------|------------|-------------|
-| Scan codebase | Scan developer-built reference implementations → extract conventions into codebase-patterns.md | Target codebase |
+| Scan codebase | Scan existing codebase → extract conventions into codebase-patterns.md (optional, improves code gen accuracy) | Target codebase |
 | Generate tests | Read developer-edited feature code + AC from ADO → generate comprehensive tests → commit to feature branch | **ADO** + target codebase (feature branch) + codebase-patterns.md |
 | Change analysis | Read change request + fetch current ADO stories → analyze impact → update ADO | **ADO** (source of truth) |
-| Product document | Fetch all ADO stories → generate Wiki pages in ADO | **ADO** (source of truth) |
 | Status | Read project.yaml → present status summary | Local files |
 
 **ADO is the single source of truth for all story data.** All downstream operations (change requests, feature code, product document) read from ADO — whether the stories were created by this pipeline or already existed. The only prerequisite is a working ADO connection with stories present. The `breakdown.json` is a temporary artifact used only when generating stories from scratch.
@@ -55,7 +59,6 @@ The design system step reads representative Figma screens to extract color token
 
 ### Be Proactive About Problems
 Before running any command, check if the prerequisites are met. If not, explain what's missing in plain language and offer to help fix it:
-- "I need your Figma access token to read the designs. You can get one from figma.com → Settings → Personal Access Tokens. Want me to walk you through it?"
 - "The breakdown is based on requirements from January 15, but the requirements were re-ingested on February 2. The estimates might be outdated. Want me to regenerate the breakdown first?"
 - "I notice there are no files in the input folder yet. Where are your requirement files? I can copy them for you."
 
@@ -75,9 +78,9 @@ Before running any command, check if the inputs it depends on are stale:
 | discover | requirements_context.md | Was it re-ingested since last discover? |
 | breakdown | overview.md, answers/ | Was overview regenerated? Were new answers added? |
 | push | breakdown.json + push_ready.json | Was breakdown regenerated since last push? |
-| design system | Figma file key in project.yaml | Is Figma configured? Has the file key changed? |
-| feature code | ADO connection + target codebase + codebase-patterns.md + design-system.md | Can we connect to ADO? Is the target codebase a git repo? Is codebase-patterns.md stale (>30 commits)? Does design-system.md exist? |
-| generate tests | ADO connection + target codebase (feature branch) + codebase-patterns.md | Can we connect to ADO? Does the feature branch exist? Is codebase-patterns.md stale? |
+| product document | ADO connection + stories in ADO | Can we connect to ADO? Have stories been pushed? |
+| feature code | ADO connection + target codebase + shared design-system.md + codebase-patterns.md (optional) | Can we connect to ADO? Is the target codebase a git repo? If codebase-patterns.md exists, is it stale (>30 commits)? |
+| generate tests | ADO connection + target codebase (feature branch) + codebase-patterns.md (optional) | Can we connect to ADO? Does the feature branch exist? |
 | change | ADO connection | Can we connect to ADO and find stories? |
 
 If stale, warn: "The [X] was generated before the latest [Y]. Running with outdated data may give inaccurate results. Want me to refresh [X] first?"
@@ -97,8 +100,7 @@ All projects live under `~/Downloads/presales-pipeline/projects/<ProjectName>/`.
 
 ```
 projects/<ProjectName>/
-├── project.yaml          # Project config: ADO credentials, Figma credentials, state, changes
-├── design-system.md      # Extracted design tokens from Figma (optional)
+├── project.yaml          # Project config: ADO credentials, state, changes
 ├── codebase-patterns.md  # Extracted conventions from target codebase (optional)
 ├── input/                # Raw requirement files (PDF, DOCX, XLSX, TXT, EML, images)
 ├── answers/              # Client answers to clarification questions
@@ -113,16 +115,16 @@ projects/<ProjectName>/
 │   ├── push_ready.json
 │   ├── product_overview.md
 │   ├── change_requests.md
-│   ├── ado_mapping.json
-│   └── screenshots/      # Figma screen exports
+│   └── ado_mapping.json
 └── snapshots/            # Versioned snapshots before change requests
 ```
+
+**Shared design system** lives at the repo root: `~/Downloads/presales-pipeline/design-system.md` (shadcn/ui component catalog, reused across all projects).
 
 ## How to Find Project Config
 
 Always read `projects/<ProjectName>/project.yaml` first to get:
 - **ADO credentials**: `ado.organization`, `ado.project`, `ado.pat`
-- **Figma credentials**: `figma.pat`, `figma.file_key`
 - **Pipeline state**: `state.*` flags showing what steps have been completed
 - **Change history**: `changes[]` array with all processed change requests
 
@@ -130,22 +132,12 @@ If the user doesn't specify a project name, check `projects/` for available proj
 
 ## Available Tools
 
-### MCP: figma (official, read-only)
-- Reads Figma design files via URL
-- Use for design system extraction and feature code generation when you need specific node details
-
-### MCP: ClaudeTalkToFigma (optional, read-write)
-- Creates and modifies designs in Figma via WebSocket
-- Requires the Figma plugin to be running and connected
-- Channel ID changes on each connection — ask the user for it
-- Not used in the BA pipeline — only relevant if editing designs
-
 ### Azure DevOps REST API
 - Base URL: `https://dev.azure.com/{organization}/{project}/_apis`
 - Auth: Basic auth with PAT (base64 encode `:{pat}`)
 - API version: `api-version=7.1`
 - Always read credentials from `project.yaml`
-- **NEVER use raw curl for ADO or Figma calls** — always use the Python `core.ado` module or the `presales` CLI commands. Raw curl breaks with special characters in PATs.
+- **NEVER use raw curl for ADO calls** — always use the Python `core.ado` module or the `presales` CLI commands. Raw curl breaks with special characters in PATs.
 
 ### Python Pipeline Scripts
 Located in `~/Downloads/presales-pipeline/`. Run with `python3 presales <command>`.
@@ -221,7 +213,7 @@ Each AC group has a **bold numbered title** (`AC 1: Title`) followed by **bullet
 - Each group covers a logical area of related behaviors
 - Bullet points within each group — specific, testable criteria
 - No Given/When/Then — write like developer notes
-- Reference specific UI elements from Figma designs when design context is available
+- Reference shadcn/ui components from the shared design system when relevant (e.g., "use DataTable with sorting", "display in a Dialog")
 - Stories have detailed, dev-ready AC from the initial push — no enrichment step needed
 
 **Technical Context block** (appended after AC groups, separated by `<hr>`):
@@ -270,7 +262,7 @@ A structured block consumed by Claude Code during feature code generation. It pr
 - **Navigation:** Route path, parent layout/section, what pages link here, where this page links to.
 - **API Hints:** Endpoints this feature needs. Method + path + key query params → response shape. Don't design the full API — just hint at what the frontend expects.
 - **Omit sections that don't apply** (e.g., a pure backend story has no States or Navigation).
-- **Don't duplicate design-system.md** — no colors, fonts, spacing. Only functional/data context.
+- **Don't duplicate design-system.md** — no component names or UI library details. Only functional/data context.
 
 ### Modification Rules (MANDATORY — applies to ALL ADO updates)
 
@@ -480,7 +472,7 @@ Before running `presales push`, generate this file with full story details:
 1. **ADO is the single source of truth** — all downstream operations (change requests, feature code, product document) read from ADO, whether the stories were created by this pipeline or already existed. The only prerequisite is a working ADO connection. The breakdown is a temporary artifact used only when generating stories from scratch.
 2. **Always read project.yaml first** to understand the project state and credentials
 3. **Never hardcode credentials** — always read from project.yaml
-4. **Ask for missing info** — if you need a Figma link, project name, or clarification, ask in plain language
+4. **Ask for missing info** — if you need a project name or clarification, ask in plain language
 5. **Wait for approval** before modifying ADO — always show proposed changes first
 6. **Match existing format** — new stories should look identical to existing ones in ADO
 6b. **Enforce hierarchy** — every User Story must have a parent Feature, every Feature must have a parent Epic. Always check existing Epics/Features before creating new ones. Always create FE/BE tasks as children of User Stories.
@@ -492,10 +484,12 @@ Before running `presales push`, generate this file with full story details:
 11. **Check for staleness** — warn if inputs have changed since artifacts were generated
 12. **Explain errors simply** — no technical jargon, always include how to fix
 13. **Guide, don't assume** — if the user seems unsure, offer the help overview
-14. **NEVER use raw curl** for ADO or Figma calls — always use Python modules
+14. **NEVER use raw curl** for ADO calls — always use Python modules
 15. **YOU do all reasoning** — never delegate analysis to a Python script. Python is for file I/O and API calls only.
 16. **Never overwrite original text in ADO** — when modifying any field, use red strikethrough for old content and green for new content. The original must always remain visible.
 17. **Change Log only on change requests** — stories do NOT get a Change Log during initial creation. The Change Log only appears when an actual change request or scope revision modifies a story. Each change request adds a sequentially numbered entry (Change 1, Change 2, …).
 17b. **Always ask for a reason** — when modifying a story, ask the user for the reason if they haven't provided one. Use "Not specified" only if the user explicitly declines.
 18. **Mark outdated stories clearly** — add `⚠️ OUTDATED` to Description, link to replacement, and log the change.
 19. **Always check story relations** — when creating or modifying any story, analyze predecessor (builds on top of) and similar (same pattern) relationships against all existing stories. Store as ADO links. Code generation reads these links to understand WHERE to place code and HOW to implement it.
+20. **Use only shadcn/ui components** — all generated UI code must use components from the shared `design-system.md` (repo root). Never introduce another component library. Read `~/Downloads/presales-pipeline/design-system.md` before generating any feature code.
+21. **Strict story scope — generate ONLY what the AC says.** When generating feature code for a user story, implement ONLY the functionality described in that story's acceptance criteria. Do NOT implement features from other user stories, even if they are related or would "make sense" on the same page. Each story's code must be self-contained to its own AC scope. Before writing any code, cross-reference the feature list against all sibling stories in the same Epic/Feature — if a capability (search, sorting, filtering, pagination, etc.) has its own dedicated story, do NOT include it in the current story's code. Leave clean integration points (e.g., props, slots, callback stubs) so the next story can add its feature without conflicts. This prevents scope bleed, partial implementations that conflict with later stories, and confusion during code review.

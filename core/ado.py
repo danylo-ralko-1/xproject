@@ -1,13 +1,15 @@
 """Azure DevOps REST API client for work item management."""
 
 import json
+import logging
 import time
 import base64
-import click
 import urllib.parse
 import urllib.request
 import urllib.error
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 
 ADO_API_VERSION = "7.1"
@@ -353,6 +355,33 @@ def upload_attachment(
                         content_type="application/json-patch+json")
 
 
+def ensure_repository(config: AdoConfig, repo_name: str) -> dict:
+    """Ensure a Git repository exists in the ADO project.
+
+    Checks if a repo with the given name already exists. If not, creates it.
+    Returns the repo metadata dict (with 'id', 'name', 'remoteUrl', etc.).
+    """
+    proj = urllib.parse.quote(config.project, safe="")
+
+    # List existing repos
+    list_url = (
+        f"https://dev.azure.com/{config.organization}/{proj}"
+        f"/_apis/git/repositories?api-version={ADO_API_VERSION}"
+    )
+    result = _api_request(config, list_url, method="GET")
+    for repo in result.get("value", []):
+        if repo.get("name", "").lower() == repo_name.lower():
+            return repo
+
+    # Create new repo
+    create_url = (
+        f"https://dev.azure.com/{config.organization}/{proj}"
+        f"/_apis/git/repositories?api-version={ADO_API_VERSION}"
+    )
+    body = {"name": repo_name}
+    return _api_request(config, create_url, method="POST", body=body)
+
+
 def get_child_work_items(config: AdoConfig, parent_id: int) -> list[dict]:
     """Get child work items (tasks) of a parent work item."""
     wiql = (
@@ -384,6 +413,230 @@ def get_child_work_items(config: AdoConfig, parent_id: int) -> list[dict]:
     )
     batch_result = _api_request(config, detail_url, method="GET")
     return batch_result.get("value", [])
+
+
+def get_work_item(
+    config: AdoConfig,
+    work_item_id: int,
+    expand: str = "relations",
+) -> dict:
+    """
+    Fetch a single work item by ID with full field data.
+
+    Args:
+        config: ADO connection config
+        work_item_id: ID of the work item
+        expand: Expansion option — "relations", "fields", "all", or "none"
+
+    Returns:
+        Work item dict with fields, relations, etc.
+    """
+    url = (
+        f"{config.base_url}/wit/workitems/{work_item_id}"
+        f"?$expand={expand}&api-version={ADO_API_VERSION}"
+    )
+    return _api_request(config, url, method="GET")
+
+
+def update_work_item_raw(
+    config: AdoConfig,
+    work_item_id: int,
+    patches: list[dict],
+) -> dict:
+    """
+    Send a raw JSON Patch array to update a work item.
+
+    Unlike update_work_item() which only handles field updates, this accepts
+    any valid JSON Patch operations including relations, removals, etc.
+
+    Args:
+        config: ADO connection config
+        work_item_id: ID of work item to update
+        patches: List of JSON Patch operations, e.g.:
+            [{"op": "add", "path": "/fields/System.Title", "value": "New Title"},
+             {"op": "add", "path": "/relations/-", "value": {...}}]
+
+    Returns:
+        Updated work item dict
+    """
+    url = f"{config.base_url}/wit/workitems/{work_item_id}?api-version={ADO_API_VERSION}"
+    return _api_request(config, url, method="PATCH", body=patches,
+                        content_type="application/json-patch+json")
+
+
+def add_artifact_link(
+    config: AdoConfig,
+    work_item_id: int,
+    artifact_uri: str,
+    name: str = "Branch",
+    comment: str = "",
+) -> dict:
+    """
+    Add an ArtifactLink (e.g. branch link) to a work item.
+
+    This makes the link appear in the Development section of the ADO UI.
+
+    Args:
+        config: ADO connection config
+        work_item_id: ID of the work item
+        artifact_uri: vstfs:///Git/Ref/{projectId}%2F{repoId}%2FGB{branch}
+        name: Link name, typically "Branch"
+        comment: Optional comment
+
+    Returns:
+        Updated work item dict
+    """
+    url = f"{config.base_url}/wit/workitems/{work_item_id}?api-version={ADO_API_VERSION}"
+    link_value = {
+        "rel": "ArtifactLink",
+        "url": artifact_uri,
+        "attributes": {
+            "name": name,
+        },
+    }
+    if comment:
+        link_value["attributes"]["comment"] = comment
+
+    patches = [{"op": "add", "path": "/relations/-", "value": link_value}]
+    return _api_request(config, url, method="PATCH", body=patches,
+                        content_type="application/json-patch+json")
+
+
+def get_wiki_list(config: AdoConfig) -> list[dict]:
+    """
+    List all wikis in the ADO project.
+
+    Returns:
+        List of wiki dicts with id, name, type, etc.
+    """
+    proj = urllib.parse.quote(config.project, safe="")
+    url = (
+        f"https://dev.azure.com/{config.organization}/{proj}"
+        f"/_apis/wiki/wikis?api-version={ADO_API_VERSION}"
+    )
+    result = _api_request(config, url, method="GET")
+    return result.get("value", [])
+
+
+def get_wiki_page(
+    config: AdoConfig,
+    wiki_id: str,
+    path: str,
+) -> dict:
+    """
+    Read a wiki page's content and ETag.
+
+    Args:
+        config: ADO connection config
+        wiki_id: Wiki identifier (name or ID)
+        path: Page path, e.g. "/Product Overview"
+
+    Returns:
+        {"content": str, "etag": str} or {"error": str} if not found
+    """
+    proj = urllib.parse.quote(config.project, safe="")
+    encoded_wiki = urllib.parse.quote(wiki_id, safe="")
+    encoded_path = urllib.parse.quote(path, safe="/")
+    url = (
+        f"https://dev.azure.com/{config.organization}/{proj}"
+        f"/_apis/wiki/wikis/{encoded_wiki}/pages?path={encoded_path}"
+        f"&includeContent=true&api-version={ADO_API_VERSION}"
+    )
+
+    headers = {
+        "Authorization": config.auth_header,
+        "Content-Type": "application/json",
+    }
+    req = urllib.request.Request(url, headers=headers, method="GET")
+
+    try:
+        time.sleep(RATE_LIMIT_DELAY)
+        with urllib.request.urlopen(req) as resp:
+            etag = resp.headers.get("ETag", "")
+            body = json.loads(resp.read().decode("utf-8"))
+            return {"content": body.get("content", ""), "etag": etag}
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return {"error": "Page not found", "status": 404}
+        body_text = ""
+        try:
+            body_text = e.read().decode("utf-8")
+        except Exception:
+            pass
+        raise RuntimeError(
+            f"Wiki page GET error {e.code}: {e.reason}\nResponse: {body_text[:500]}"
+        )
+
+
+def upsert_wiki_page(
+    config: AdoConfig,
+    wiki_id: str,
+    path: str,
+    content: str,
+    etag: str | None = None,
+) -> dict:
+    """
+    Create or update a wiki page.
+
+    Args:
+        config: ADO connection config
+        wiki_id: Wiki identifier (name or ID)
+        path: Page path, e.g. "/Product Overview"
+        content: Markdown content for the page
+        etag: If provided, updates existing page (required for updates).
+              If None, creates a new page.
+
+    Returns:
+        Page metadata dict from ADO API
+    """
+    proj = urllib.parse.quote(config.project, safe="")
+    encoded_wiki = urllib.parse.quote(wiki_id, safe="")
+    encoded_path = urllib.parse.quote(path, safe="/")
+    url = (
+        f"https://dev.azure.com/{config.organization}/{proj}"
+        f"/_apis/wiki/wikis/{encoded_wiki}/pages?path={encoded_path}"
+        f"&api-version={ADO_API_VERSION}"
+    )
+
+    headers = {
+        "Authorization": config.auth_header,
+        "Content-Type": "application/json",
+    }
+    if etag:
+        headers["If-Match"] = etag
+
+    body = json.dumps({"content": content}).encode("utf-8")
+    req = urllib.request.Request(url, data=body, headers=headers, method="PUT")
+
+    try:
+        time.sleep(RATE_LIMIT_DELAY)
+        with urllib.request.urlopen(req) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        body_text = ""
+        try:
+            body_text = e.read().decode("utf-8")
+        except Exception:
+            pass
+        raise RuntimeError(
+            f"Wiki page PUT error {e.code}: {e.reason}\nResponse: {body_text[:500]}"
+        )
+
+
+def list_repositories(config: AdoConfig) -> list[dict]:
+    """
+    List all Git repositories in the ADO project.
+
+    Returns:
+        List of repo dicts with id, name, remoteUrl, etc.
+    """
+    proj = urllib.parse.quote(config.project, safe="")
+    url = (
+        f"https://dev.azure.com/{config.organization}/{proj}"
+        f"/_apis/git/repositories?api-version={ADO_API_VERSION}"
+    )
+    result = _api_request(config, url, method="GET")
+    return result.get("value", [])
 
 
 # --- Internal helpers ---
@@ -423,7 +676,7 @@ def _api_request(
 
             if e.code == 429:  # Rate limited
                 delay = 2 ** (attempt + 1)
-                click.secho(f"    Rate limited, waiting {delay}s...", fg="yellow")
+                logger.warning("Rate limited, waiting %ds...", delay)
                 time.sleep(delay)
                 continue
             elif e.code >= 500 and attempt < retries - 1:

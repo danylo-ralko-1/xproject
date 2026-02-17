@@ -49,6 +49,19 @@ def run(proj: dict, dry_run: bool = False) -> None:
             return
         click.secho("  ✓ Connected to ADO", fg="green")
 
+        # Ensure Azure Repos repository exists for feature code generation
+        click.echo("  Ensuring Azure Repos repository exists...")
+        try:
+            repo = ado_client.ensure_repository(config, project_name)
+            repo_url = repo.get("remoteUrl", "")
+            if repo_url:
+                click.secho(f"  ✓ Repository ready: {repo_url}", fg="green")
+            else:
+                click.secho(f"  ✓ Repository '{project_name}' exists", fg="green")
+        except Exception as e:
+            click.secho(f"  ⚠ Could not create repository: {e}", fg="yellow")
+            click.echo("    Feature code generation will need a repo later.")
+
         # Query existing Epics/Features to avoid creating duplicates
         click.echo("  Checking for existing work items...")
         existing_items = _fetch_existing_items(config)
@@ -256,12 +269,15 @@ def run(proj: dict, dry_run: bool = False) -> None:
 def _fetch_existing_items(config) -> dict:
     """Fetch existing Epics and Features from ADO for duplicate detection.
 
+    Only queries the current project to avoid cross-project matches.
     Returns {"epics": {title: ado_id}, "features": {title: ado_id}}.
     """
+    project = config.project
     wiql = (
         "SELECT [System.Id], [System.Title], [System.WorkItemType] "
         "FROM WorkItems WHERE [System.WorkItemType] IN ('Epic', 'Feature') "
         "AND [System.State] <> 'Removed' "
+        f"AND [System.TeamProject] = '{project}' "
         "ORDER BY [System.Id] ASC"
     )
     try:
