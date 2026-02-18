@@ -30,10 +30,6 @@ IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
 ALL_SUPPORTED = TEXT_EXTS | PDF_EXTS | DOCX_EXTS | EXCEL_EXTS | CSV_EXTS | EMAIL_EXTS | IMAGE_EXTS
 
-# Context window threshold: ~150K tokens at 4 chars/token.
-# Leaves ~50K tokens for system prompts, conversation history, and working memory.
-CONTEXT_CHAR_THRESHOLD = 600_000
-
 
 @dataclass
 class ParsedFile:
@@ -137,6 +133,11 @@ def build_context(parsed_files: list[ParsedFile]) -> tuple[str, list[dict]]:
 
     text_context = "\n\n".join(text_parts)
     return text_context, image_blocks
+
+
+def parsed_filename(source_filename: str) -> str:
+    """Convert a source filename to its parsed .md filename for output/parsed/."""
+    return source_filename.replace(" ", "-") + ".md"
 
 
 # --- Individual parsers ---
@@ -379,55 +380,6 @@ def estimate_tokens(text: str) -> int:
 def compute_file_hash(text: str) -> str:
     """Short content hash for change detection between ingests."""
     return hashlib.md5(text.encode("utf-8")).hexdigest()[:12]
-
-
-def build_section_index(text_context: str, parsed_files: list[ParsedFile]) -> list[dict]:
-    """
-    Build a line-offset index for each source file within requirements_context.md.
-
-    The combined context file uses headers like:
-        --- [filename.pdf] (pdf) ---
-
-    This function finds each header's line position so skills can use
-    Read(offset=start_line, limit=end_line-start_line) to read a single
-    source file's content without loading the entire context.
-
-    Returns a list of dicts:
-        [{"source": "RFP-Document.pdf", "format": "pdf",
-          "start_line": 1, "end_line": 450,
-          "chars": 42300, "estimated_tokens": 10575}]
-    """
-    lines = text_context.split("\n")
-    # Find all section header positions
-    headers = []
-    for i, line in enumerate(lines):
-        if line.startswith("--- [") and line.endswith(" ---"):
-            # Parse "--- [filename.pdf] (pdf) ---"
-            inner = line[5:-4]  # strip "--- [" and " ---"
-            bracket_end = inner.index("]")
-            source = inner[:bracket_end]
-            fmt = inner[bracket_end + 3:-1]  # skip "] (" and strip ")"
-            headers.append({"source": source, "format": fmt, "start_line": i + 1})  # 1-indexed
-
-    # Compute end lines and char/token counts
-    sections = []
-    for idx, hdr in enumerate(headers):
-        if idx + 1 < len(headers):
-            end_line = headers[idx + 1]["start_line"] - 1
-        else:
-            end_line = len(lines)
-        # Count chars in this section (start_line is 1-indexed, so subtract 1 for list index)
-        section_lines = lines[hdr["start_line"] - 1 : end_line]
-        section_text = "\n".join(section_lines)
-        sections.append({
-            "source": hdr["source"],
-            "format": hdr["format"],
-            "start_line": hdr["start_line"],
-            "end_line": end_line,
-            "chars": len(section_text),
-            "estimated_tokens": estimate_tokens(section_text),
-        })
-    return sections
 
 
 # --- Table formatting helpers ---

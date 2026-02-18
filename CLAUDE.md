@@ -30,7 +30,7 @@ The pipeline uses a **shared design system** (`design-system.md` at the repo roo
 | Command | What it does |
 |---------|-------------|
 | `presales init <project>` | Interactive project setup (folders + config) |
-| `presales ingest <project>` | Extract text from files → requirements_context.md |
+| `presales ingest <project>` | Parse files → per-file .md in output/parsed/ |
 | `presales breakdown-export <project>` | Convert breakdown.json → breakdown.xlsx |
 | `presales push <project>` | Create ADO work items from breakdown.json (with AC you provide) |
 
@@ -39,7 +39,7 @@ The pipeline uses a **shared design system** (`design-system.md` at the repo roo
 **Main pipeline:**
 | Task | What you do | Data source |
 |------|------------|-------------|
-| Discovery | Read requirements_context.md → generate overview.md + questions.txt | Local files |
+| Discovery | Read parsed files from output/parsed/ → generate overview.md + questions.txt | Local files |
 | Breakdown | Read overview + answers → generate breakdown.json | Local files |
 | Push AC | Generate user story text + detailed AC + technical context → write push_ready.json → then run push script | Local files (breakdown.json + overview + requirements) |
 | Product document | Fetch all ADO stories → generate product overview Wiki pages in ADO | **ADO** (source of truth) |
@@ -55,19 +55,20 @@ The pipeline uses a **shared design system** (`design-system.md` at the repo roo
 
 **ADO is the single source of truth for all story data.** All downstream operations (change requests, feature code, product document) read from ADO — whether the stories were created by this pipeline or already existed. The only prerequisite is a working ADO connection with stories present. The `breakdown.json` is a temporary artifact used only when generating stories from scratch.
 
-### Context Strategy (large document sets)
+### Requirements Storage
 
-When a project's combined requirements exceed **600,000 characters** (~150K tokens), the ingest command builds a line-offset index in the manifest so each source file's section within `requirements_context.md` can be read independently. Everything stays in one file — no separate section files.
+The ingest command parses each input file (PDF, DOCX, XLSX, etc.) into a separate `.md` file in `output/parsed/`. There is no combined context file — each source gets its own parsed file, which keeps things simple and supports projects of any size.
 
-The manifest (`requirements_manifest.json`) includes `summary.context_strategy`:
-- **`"full"`**: context fits in a single read (default, backwards-compatible).
-- **`"sectioned"`**: context is too large — the manifest includes a `sections` array with `start_line` / `end_line` offsets for each source file. Discovery reads each section via `Read(offset=start_line, limit=...)` one at a time.
+The manifest (`requirements_manifest.json`) tracks every parsed file with its `content_hash` and `parsed_file` name. It also flags changes between ingests:
+- `summary.new_files` — files added since last ingest
+- `summary.changed_files` — files whose content changed
+- `summary.removed_files` — files that were deleted from input
 
-**After discovery, `overview.md` is always the primary source** — regardless of strategy. It contains the synthesized scope plus a **Source Reference** table mapping topics to source files. Downstream skills (breakdown, push) read the overview first, then use the Source Reference + manifest line offsets to do **targeted reads** of only the relevant section within `requirements_context.md` — never the full file again.
+**Discovery reads parsed files one at a time**, takes notes on each, then synthesizes everything into `overview.md` with a **Source Reference** table mapping topics to source files. After discovery, `overview.md` is the primary source for all downstream operations.
 
-**Incremental discovery:** Ingest tracks per-file content hashes. When new files are added or existing files change, the manifest flags them (`summary.new_files`, `summary.changed_files`, `summary.removed_files`). Discovery reads only the new/changed sections and updates the existing overview — no need to re-read all 25 files when 1 is added.
+**Incremental discovery:** When new files are added or existing files change, discovery reads only the new/changed files plus the existing overview, then updates the overview. No need to re-read all files when 1 is added.
 
-**Zero change for small projects.** The threshold check runs silently; projects under the limit behave exactly as today.
+**Targeted detail reads:** When generating detailed AC (breakdown, push), the overview is read first. If specific detail is needed (field names, validation rules, enum values), the Source Reference table in the overview points to the exact source file in `output/parsed/` — read just that file, not everything.
 
 ## Conversation Behavior
 
@@ -89,7 +90,7 @@ Before running any command, check if the inputs it depends on are stale:
 
 | Command | Depends on | Check |
 |---------|-----------|-------|
-| discover | requirements_context.md | Was it re-ingested since last discover? |
+| discover | output/parsed/ files | Was it re-ingested since last discover? |
 | breakdown | overview.md, answers/ | Was overview regenerated? Were new answers added? |
 | push | breakdown.json + push_ready.json | Was breakdown regenerated since last push? |
 | product document | ADO connection + stories in ADO | Can we connect to ADO? Have stories been pushed? |
@@ -120,7 +121,7 @@ projects/<ProjectName>/
 ├── answers/              # Client answers to clarification questions
 ├── changes/              # Change request source files
 ├── output/               # Generated artifacts
-│   ├── requirements_context.md
+│   ├── parsed/           # Per-file parsed .md (one per input file)
 │   ├── requirements_manifest.json
 │   ├── overview.md
 │   ├── questions.txt

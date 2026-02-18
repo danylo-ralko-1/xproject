@@ -21,11 +21,10 @@ Also read any files in `projects/<ProjectName>/answers/`.
 
 When generating detailed AC and technical context for each story, you will need specifics the overview doesn't cover (exact field definitions, enum values, validation rules, API shapes). **Use the Source Reference table** in the overview to identify which source file has the detail for each story's topic, then:
 
-- Look up the source filename in the `sections` array in `requirements_manifest.json` to get its `start_line` and `end_line`.
-- Read just that section: `Read("requirements_context.md", offset=start_line, limit=end_line - start_line + 1)`.
-- For small projects (no `sections` in manifest), read `requirements_context.md` in full — it's small enough.
-- **Read per story batch, not upfront.** Before generating AC for a batch of stories, identify the 2-3 source files relevant to those stories from the Source Reference, read their sections, then generate. This keeps context focused.
-- **Don't re-read sections already in context.** If two stories in the same batch need the same source file, read it once.
+- Look up the source filename in the Source Reference, find its `parsed_file` in the manifest's `files` array.
+- Read that file directly from `output/parsed/<parsed_file>`.
+- **Read per story batch, not upfront.** Before generating AC for a batch of stories, identify the 2-3 source files relevant to those stories from the Source Reference, read them, then generate. This keeps context focused.
+- **Don't re-read files already in context.** If two stories in the same batch need the same source file, read it once.
 
 For EVERY story in the breakdown, generate:
 - `user_story`: Three-line format — "As a [role],\nI want to [action],\nSo that [benefit]."

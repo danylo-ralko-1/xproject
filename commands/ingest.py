@@ -9,18 +9,18 @@ from core.config import (
 )
 from core.context import compute_input_hash, invalidate_downstream
 from core.parser import (
-    parse_directory, build_context, build_section_index, estimate_tokens,
-    compute_file_hash, ParsedFile, CONTEXT_CHAR_THRESHOLD,
+    parse_directory, estimate_tokens, compute_file_hash, parsed_filename,
+    ParsedFile,
 )
 
 
 def run(proj: dict) -> None:
     """
     Parse all files in input/ directory and produce:
-      - output/requirements_context.md  (combined text for downstream prompts)
+      - output/parsed/<filename>.md  (one per source file)
       - output/requirements_manifest.json (metadata about parsed files)
 
-    Updates project state with requirements hash.
+    Only new/changed files are written. Removed files are cleaned up.
     """
     input_dir = get_input_dir(proj)
     project_name = proj["project"]
@@ -57,13 +57,6 @@ def run(proj: dict) -> None:
         for pf in errors:
             click.echo(f"    ⚠ {pf.filename:40s} ({pf.error})")
 
-    # Build combined context
-    text_context, image_blocks = build_context(parsed)
-
-    if not text_context and not image_blocks:
-        click.secho("\n  ✗ No content extracted from any file", fg="red")
-        return
-
     # Detect per-file changes against previous manifest
     prev_hashes = _load_previous_hashes(proj)
     file_changes = _detect_changes(parsed, prev_hashes)
@@ -80,29 +73,53 @@ def run(proj: dict) -> None:
         for f in removed_files:
             click.echo(f"    - {f} (removed)")
 
-    # Save requirements context (text) — always written regardless of strategy
-    ctx_path = get_output_path(proj, "requirements_context.md")
-    ctx_path.parent.mkdir(parents=True, exist_ok=True)
-    ctx_path.write_text(text_context, encoding="utf-8")
+    # Ensure parsed directory exists
+    parsed_dir = get_output_path(proj, "parsed")
+    parsed_dir.mkdir(parents=True, exist_ok=True)
 
-    # Determine context strategy based on size
-    total_chars = len(text_context)
-    est_tokens = estimate_tokens(text_context)
-    sections_index = []
+    # Write parsed .md files — only for new/changed files
+    total_chars = 0
+    written = 0
+    for pf in parsed:
+        if pf.error or pf.is_image or not pf.text.strip():
+            continue
+        out_name = parsed_filename(pf.filename)
+        out_path = parsed_dir / out_name
+        content = f"# {pf.filename} ({pf.format})\n\n{pf.text.strip()}"
+        total_chars += len(content)
 
-    if total_chars > CONTEXT_CHAR_THRESHOLD:
-        context_strategy = "sectioned"
-        click.secho(
-            f"\n  ⚠ Context is large ({_human_size(total_chars)}, ~{est_tokens:,} tokens). "
-            f"Indexed {len([p for p in parsed if not p.error and not p.is_image])} sections "
-            f"with line offsets for incremental reading.",
-            fg="yellow",
-        )
-        sections_index = build_section_index(text_context, parsed)
-    else:
-        context_strategy = "full"
+        change = file_changes.get(pf.filename, "new")
+        if change in ("new", "changed"):
+            out_path.write_text(content, encoding="utf-8")
+            written += 1
 
-    # Save manifest (metadata about what was parsed)
+    # Remove parsed files for deleted source files
+    for fname in removed_files:
+        old_path = parsed_dir / parsed_filename(fname)
+        if old_path.exists():
+            old_path.unlink()
+
+    if written:
+        click.secho(f"    Wrote {written} parsed file(s) to output/parsed/", fg="cyan")
+
+    # Save image references for downstream use
+    image_blocks = []
+    if images:
+        images_path = get_output_path(proj, "requirements_images.json")
+        img_refs = []
+        for pf in images:
+            img_refs.append({
+                "filename": pf.filename,
+                "media_type": pf.image_media_type,
+                "size_bytes": pf.metadata.get("size_bytes", 0),
+                "path": str(input_dir / pf.filename),
+            })
+        with open(images_path, "w", encoding="utf-8") as f:
+            json.dump(img_refs, f, indent=2)
+        click.secho(f"\n  📷 {len(images)} image(s) detected — will be sent to Claude vision", fg="cyan")
+
+    # Save manifest
+    est_tokens = estimate_tokens("x" * total_chars)  # approximate
     manifest = {
         "project": project_name,
         "files": [_file_manifest(pf, file_changes.get(pf.filename, "new")) for pf in parsed],
@@ -114,41 +131,22 @@ def run(proj: dict) -> None:
             "image_files": len(images),
             "total_text_chars": total_chars,
             "estimated_tokens": est_tokens,
-            "context_strategy": context_strategy,
             "new_files": new_files,
             "changed_files": changed_files,
             "removed_files": removed_files,
         },
     }
-    if sections_index:
-        manifest["sections"] = sections_index
 
     manifest_path = get_output_path(proj, "requirements_manifest.json")
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
 
-    # If there are images, save their references for downstream use
-    if image_blocks:
-        images_path = get_output_path(proj, "requirements_images.json")
-        # Save just metadata, not the full base64 (too large for JSON)
-        img_refs = []
-        for pf in images:
-            img_refs.append({
-                "filename": pf.filename,
-                "media_type": pf.image_media_type,
-                "size_bytes": pf.metadata.get("size_bytes", 0),
-                "path": str(input_dir / pf.filename),
-            })
-        with open(images_path, "w", encoding="utf-8") as f:
-            json.dump(img_refs, f, indent=2)
-
-        click.secho(f"\n  📷 {len(images)} image(s) detected — will be sent to Claude vision", fg="cyan")
-
     # Compute hash and update state
     req_hash = compute_input_hash(proj)
 
-    # Invalidate downstream artifacts since requirements changed
-    invalidate_downstream(proj, "ingest")
+    # Invalidate downstream artifacts only if something actually changed
+    if new_files or changed_files or removed_files or not prev_hashes:
+        invalidate_downstream(proj, "ingest")
 
     # Update state
     update_state(
@@ -160,7 +158,7 @@ def run(proj: dict) -> None:
 
     # Summary
     click.secho(f"\n  ✓ Requirements ingested successfully", fg="green", bold=True)
-    click.echo(f"    Context: {ctx_path} ({_human_size(len(text_context))})")
+    click.echo(f"    Parsed files: {parsed_dir}/ ({len(text_files)} files, {_human_size(total_chars)})")
     click.echo(f"    Manifest: {manifest_path}")
     click.echo(f"    Hash: {req_hash}")
     click.echo(f"\n    Next step: presales discover {project_name}")
@@ -202,6 +200,7 @@ def _file_manifest(pf: ParsedFile, change_status: str = "new") -> dict:
         entry["text_length"] = len(pf.text)
         entry["estimated_tokens"] = estimate_tokens(pf.text)
         entry["content_hash"] = compute_file_hash(pf.text)
+        entry["parsed_file"] = parsed_filename(pf.filename)
     entry.update({k: v for k, v in pf.metadata.items()})
     return entry
 

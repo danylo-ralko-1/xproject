@@ -30,7 +30,7 @@ Just drag and drop your files (PDF, DOCX, XLSX, images) directly into the Claude
 
 Claude will save the files, parse them, extract the requirements, and generate a summary with clarification questions for the client.
 
-**Large document sets (20+ files):** If the combined requirements exceed Claude's context window, the system indexes each source file's position within the combined context and builds a Source Reference mapping topics to source files. Downstream steps use the overview as the primary source and do targeted reads of only the relevant sections — no detail is lost, and the full context is never re-read unnecessarily.
+**Large document sets (20+ files):** Each input file is parsed into its own `.md` file in `output/parsed/` — no combined mega-file. Claude reads each parsed file one at a time during discovery and synthesizes everything into an overview with a Source Reference table. Downstream steps use the overview as the primary source and do targeted reads of only the relevant parsed files when detail is needed. Incremental re-ingestion only processes new or changed files.
 
 ### Generating stories
 

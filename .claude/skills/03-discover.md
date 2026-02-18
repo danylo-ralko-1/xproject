@@ -8,35 +8,22 @@
 
 **What to do:**
 
-## Step 0: Check context strategy and detect incremental changes
-Read `output/requirements_manifest.json` and check two things:
+## Step 0: Check for incremental changes
+Read `output/requirements_manifest.json` and check `summary.new_files`, `summary.changed_files`, and `summary.removed_files`:
 
-### 0a: Incremental vs full discovery
-Check `summary.new_files` and `summary.changed_files` in the manifest:
-
-- **If `overview.md` does NOT exist yet** (first run): do a **full discovery** (read everything, generate overview from scratch).
+- **If `overview.md` does NOT exist yet** (first run): do a **full discovery** — read all parsed files from `output/parsed/` one by one, take notes on each, then synthesize into overview and questions.
 - **If `overview.md` exists AND `new_files` + `changed_files` lists are non-empty**: do an **incremental discovery**:
   1. Read the existing `overview.md` (including the Source Reference table).
-  2. Read ONLY the sections for new/changed files from `requirements_context.md` using their line offsets from the `sections` array (or search for the `--- [filename] ---` header if no sections array).
+  2. Read ONLY the parsed files for new/changed sources from `output/parsed/` (the manifest's `files` array has the `parsed_file` field with the filename).
   3. Update the overview to incorporate the new/changed information — add new topics, revise affected sections, update the Source Reference table with new rows or modified entries.
   4. If files were removed (`summary.removed_files`), remove their references from the Source Reference and flag any overview sections that relied solely on those files.
   5. Regenerate `questions.txt` only if the new information raises new questions.
 - **If `overview.md` exists AND no new/changed/removed files**: skip discovery entirely — tell the user "Requirements haven't changed since last overview."
 
-### 0b: Reading strategy (for full discovery only)
-Check `summary.context_strategy`:
-
-- **`"full"`** (or missing field — backwards compat): read `requirements_context.md` as a single file.
-- **`"sectioned"`**: the combined context exceeds the token window. Instead of reading in one go:
-  1. Read the `sections` array from the manifest to get the list of sections with their `start_line` and `end_line` offsets.
-  2. Read each section from `requirements_context.md` one at a time using `Read(offset=start_line, limit=end_line - start_line + 1)`.
-  3. After reading each section, take brief notes (key topics, entities, requirements, unknowns).
-  4. After all sections are read, synthesize the notes into the overview and questions (Steps 1-2).
-
-All content lives in one file (`requirements_context.md`) — the manifest just stores line offsets so each section can be read independently.
+For full discovery with many files, read each file from `output/parsed/` one at a time, take brief notes (key topics, entities, requirements, unknowns), then synthesize after all are read. This handles large document sets naturally — each file is its own small read.
 
 ## Step 1: Generate overview.md
-Read `requirements_context.md` (if full discovery + `"full"` strategy) or use notes from section-by-section reading (if full discovery + `"sectioned"` strategy) or update the existing overview (if incremental) and generate a structured scope summary covering:
+Use notes from reading parsed files (full discovery) or update the existing overview (incremental) to generate a structured scope summary covering:
 - Business problem and desired solution
 - Functional scope (grouped by feature area)
 - User roles and permissions

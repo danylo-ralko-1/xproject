@@ -25,10 +25,9 @@ This skill runs ENTIRELY in conversation. You read files, generate the breakdown
 2. Read any files in `projects/<ProjectName>/answers/` (if they exist)
    - If no answers: use reasonable defaults and mark assumptions
 3. **Targeted detail reads** — while generating the epic/feature/story structure and estimates, consult the Source Reference table in the overview whenever you need specifics the overview doesn't cover (exact field definitions, validation rules, workflow details). Then:
-   - Look up the source filename in the `sections` array in `requirements_manifest.json` to get its `start_line` and `end_line`.
-   - Read just that section: `Read("requirements_context.md", offset=start_line, limit=end_line - start_line + 1)`.
-   - For small projects (no `sections` in manifest), read `requirements_context.md` in full — it's small enough.
-   - **Only read what you need.** Don't read the full context — the Source Reference tells you exactly which section has the detail for each topic.
+   - Look up the source filename in the Source Reference, find its `parsed_file` in the manifest's `files` array.
+   - Read that file directly from `output/parsed/<parsed_file>`.
+   - **Only read what you need.** Don't read all parsed files — the Source Reference tells you exactly which one has the detail for each topic.
 
 ### Step 2: Generate Epic/Feature/Story Structure
 
