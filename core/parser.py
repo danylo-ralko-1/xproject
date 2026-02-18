@@ -375,35 +375,51 @@ def estimate_tokens(text: str) -> int:
     return len(text) // 4
 
 
-def build_sections(parsed_files: list[ParsedFile]) -> list[dict]:
+def build_section_index(text_context: str, parsed_files: list[ParsedFile]) -> list[dict]:
     """
-    Build per-file section metadata for large document sets.
+    Build a line-offset index for each source file within requirements_context.md.
 
-    When the combined context exceeds CONTEXT_CHAR_THRESHOLD, each file gets its
-    own numbered markdown section that can be read independently by skills.
+    The combined context file uses headers like:
+        --- [filename.pdf] (pdf) ---
+
+    This function finds each header's line position so skills can use
+    Read(offset=start_line, limit=end_line-start_line) to read a single
+    source file's content without loading the entire context.
 
     Returns a list of dicts:
-        [{"index": 1, "filename": "001_RFP-Document.pdf.md",
-          "source": "RFP-Document.pdf", "format": "pdf",
-          "chars": 42300, "estimated_tokens": 10575, "content": "..."}]
+        [{"source": "RFP-Document.pdf", "format": "pdf",
+          "start_line": 1, "end_line": 450,
+          "chars": 42300, "estimated_tokens": 10575}]
     """
+    lines = text_context.split("\n")
+    # Find all section header positions
+    headers = []
+    for i, line in enumerate(lines):
+        if line.startswith("--- [") and line.endswith(" ---"):
+            # Parse "--- [filename.pdf] (pdf) ---"
+            inner = line[5:-4]  # strip "--- [" and " ---"
+            bracket_end = inner.index("]")
+            source = inner[:bracket_end]
+            fmt = inner[bracket_end + 3:-1]  # skip "] (" and strip ")"
+            headers.append({"source": source, "format": fmt, "start_line": i + 1})  # 1-indexed
+
+    # Compute end lines and char/token counts
     sections = []
-    idx = 0
-    for pf in parsed_files:
-        if pf.error or pf.is_image or not pf.text.strip():
-            continue
-        idx += 1
-        safe_name = pf.filename.replace(" ", "-")
-        section_filename = f"{idx:03d}_{safe_name}.md"
-        content = f"# {pf.filename} ({pf.format})\n\n{pf.text.strip()}"
+    for idx, hdr in enumerate(headers):
+        if idx + 1 < len(headers):
+            end_line = headers[idx + 1]["start_line"] - 1
+        else:
+            end_line = len(lines)
+        # Count chars in this section (start_line is 1-indexed, so subtract 1 for list index)
+        section_lines = lines[hdr["start_line"] - 1 : end_line]
+        section_text = "\n".join(section_lines)
         sections.append({
-            "index": idx,
-            "filename": section_filename,
-            "source": pf.filename,
-            "format": pf.format,
-            "chars": len(content),
-            "estimated_tokens": estimate_tokens(content),
-            "content": content,
+            "source": hdr["source"],
+            "format": hdr["format"],
+            "start_line": hdr["start_line"],
+            "end_line": end_line,
+            "chars": len(section_text),
+            "estimated_tokens": estimate_tokens(section_text),
         })
     return sections
 

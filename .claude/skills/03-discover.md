@@ -13,12 +13,12 @@ Read `output/requirements_manifest.json` and check `summary.context_strategy`:
 
 - **`"full"`** (or missing field — backwards compat): proceed to Step 1 normally, read `requirements_context.md` as a single file.
 - **`"sectioned"`**: the combined context exceeds the token window. Instead of reading `requirements_context.md` in one go:
-  1. Read the `sections` array from the manifest to get the list of section files.
-  2. Read each section file from `output/requirements_sections/` one at a time.
+  1. Read the `sections` array from the manifest to get the list of sections with their `start_line` and `end_line` offsets.
+  2. Read each section from `requirements_context.md` one at a time using `Read(offset=start_line, limit=end_line - start_line + 1)`.
   3. After reading each section, take brief notes (key topics, entities, requirements, unknowns).
   4. After all sections are read, synthesize the notes into the overview and questions (Steps 1-2).
 
-This ensures large document sets are processed incrementally without exceeding context limits.
+This ensures large document sets are processed incrementally without exceeding context limits. All content lives in one file (`requirements_context.md`) — the manifest just stores line offsets so each section can be read independently.
 
 ## Step 1: Generate overview.md
 Read `requirements_context.md` (if strategy is `"full"`) or use notes from section-by-section reading (if strategy is `"sectioned"`) and generate a structured scope summary covering:

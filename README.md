@@ -30,7 +30,7 @@ Just drag and drop your files (PDF, DOCX, XLSX, images) directly into the Claude
 
 Claude will save the files, parse them, extract the requirements, and generate a summary with clarification questions for the client.
 
-**Large document sets (20+ files):** If the combined requirements exceed Claude's context window, the system automatically splits them into per-file sections and builds a Source Reference index mapping topics to source files. Downstream steps use the overview as the primary source and do targeted reads of only the specific files needed for each story — no detail is lost, and the full context is never re-read unnecessarily.
+**Large document sets (20+ files):** If the combined requirements exceed Claude's context window, the system indexes each source file's position within the combined context and builds a Source Reference mapping topics to source files. Downstream steps use the overview as the primary source and do targeted reads of only the relevant sections — no detail is lost, and the full context is never re-read unnecessarily.
 
 ### Generating stories
 
@@ -152,7 +152,7 @@ presales-pipeline/
 │       ├── input/        # Drop your requirement files here
 │       ├── answers/      # Client answers to clarification questions
 │       ├── changes/      # Change request files
-│       ├── output/       # Everything Claude generates (incl. requirements_sections/ for large projects)
+│       ├── output/       # Everything Claude generates
 │       └── snapshots/    # Auto-snapshots before change requests
 └── CLAUDE.md             # Instructions Claude follows automatically
 ```

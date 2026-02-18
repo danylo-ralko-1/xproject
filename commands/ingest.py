@@ -9,7 +9,7 @@ from core.config import (
 )
 from core.context import compute_input_hash, invalidate_downstream
 from core.parser import (
-    parse_directory, build_context, build_sections, estimate_tokens,
+    parse_directory, build_context, build_section_index, estimate_tokens,
     ParsedFile, CONTEXT_CHAR_THRESHOLD,
 )
 
@@ -72,42 +72,19 @@ def run(proj: dict) -> None:
     # Determine context strategy based on size
     total_chars = len(text_context)
     est_tokens = estimate_tokens(text_context)
-    sections_meta = []
+    sections_index = []
 
     if total_chars > CONTEXT_CHAR_THRESHOLD:
         context_strategy = "sectioned"
         click.secho(
             f"\n  ⚠ Context is large ({_human_size(total_chars)}, ~{est_tokens:,} tokens). "
-            f"Splitting into per-file sections for incremental reading.",
+            f"Indexed {len([p for p in parsed if not p.error and not p.is_image])} sections "
+            f"with line offsets for incremental reading.",
             fg="yellow",
         )
-        sections = build_sections(parsed)
-        sections_dir = ctx_path.parent / "requirements_sections"
-        # Clear old sections if re-ingesting
-        if sections_dir.exists():
-            for old in sections_dir.iterdir():
-                old.unlink()
-        sections_dir.mkdir(parents=True, exist_ok=True)
-        for sec in sections:
-            sec_path = sections_dir / sec["filename"]
-            sec_path.write_text(sec["content"], encoding="utf-8")
-            sections_meta.append({
-                "index": sec["index"],
-                "filename": sec["filename"],
-                "source": sec["source"],
-                "format": sec["format"],
-                "chars": sec["chars"],
-                "estimated_tokens": sec["estimated_tokens"],
-            })
-        click.secho(f"    Created {len(sections)} section files in requirements_sections/", fg="yellow")
+        sections_index = build_section_index(text_context, parsed)
     else:
         context_strategy = "full"
-        # Clean up sections dir if it exists from a previous larger ingest
-        sections_dir = ctx_path.parent / "requirements_sections"
-        if sections_dir.exists():
-            for old in sections_dir.iterdir():
-                old.unlink()
-            sections_dir.rmdir()
 
     # Save manifest (metadata about what was parsed)
     manifest = {
@@ -124,8 +101,8 @@ def run(proj: dict) -> None:
             "context_strategy": context_strategy,
         },
     }
-    if sections_meta:
-        manifest["sections"] = sections_meta
+    if sections_index:
+        manifest["sections"] = sections_index
 
     manifest_path = get_output_path(proj, "requirements_manifest.json")
     with open(manifest_path, "w", encoding="utf-8") as f:

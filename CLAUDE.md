@@ -57,13 +57,13 @@ The pipeline uses a **shared design system** (`design-system.md` at the repo roo
 
 ### Context Strategy (large document sets)
 
-When a project's combined requirements exceed **600,000 characters** (~150K tokens), the ingest command automatically splits the content into per-file sections under `output/requirements_sections/`. The full `requirements_context.md` is always written for archival, but skills read sections incrementally to stay within the context window.
+When a project's combined requirements exceed **600,000 characters** (~150K tokens), the ingest command builds a line-offset index in the manifest so each source file's section within `requirements_context.md` can be read independently. Everything stays in one file — no separate section files.
 
 The manifest (`requirements_manifest.json`) includes `summary.context_strategy`:
 - **`"full"`**: context fits in a single read (default, backwards-compatible).
-- **`"sectioned"`**: context is too large — discovery reads section files one at a time from `requirements_sections/`, takes notes, and synthesizes.
+- **`"sectioned"`**: context is too large — the manifest includes a `sections` array with `start_line` / `end_line` offsets for each source file. Discovery reads each section via `Read(offset=start_line, limit=...)` one at a time.
 
-**After discovery, `overview.md` is always the primary source** — regardless of strategy. It contains the synthesized scope plus a **Source Reference** table mapping topics to source files. Downstream skills (breakdown, push) read the overview first, then use the Source Reference to do **targeted reads** of only the specific source files needed for each story's AC — never the full 600K context again.
+**After discovery, `overview.md` is always the primary source** — regardless of strategy. It contains the synthesized scope plus a **Source Reference** table mapping topics to source files. Downstream skills (breakdown, push) read the overview first, then use the Source Reference + manifest line offsets to do **targeted reads** of only the relevant section within `requirements_context.md` — never the full file again.
 
 **Zero change for small projects.** The threshold check runs silently; projects under the limit behave exactly as today.
 
