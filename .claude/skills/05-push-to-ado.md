@@ -13,7 +13,19 @@ This skill has TWO phases: you generate the story details, then the Python scrip
 
 ## Phase 1: Generate push_ready.json (YOU do this)
 
-Read `projects/<ProjectName>/output/breakdown.json`, `projects/<ProjectName>/output/overview.md`, `projects/<ProjectName>/output/requirements_context.md`, and any files in `projects/<ProjectName>/answers/`.
+Read `projects/<ProjectName>/output/breakdown.json` and `projects/<ProjectName>/output/overview.md`. The overview is the **primary source** — it contains the synthesized scope AND a **Source Reference** table mapping topics to source files.
+
+Also read any files in `projects/<ProjectName>/answers/`.
+
+### Targeted detail reads for AC generation
+
+When generating detailed AC and technical context for each story, you will need specifics the overview doesn't cover (exact field definitions, enum values, validation rules, API shapes). **Use the Source Reference table** in the overview to identify which source file has the detail for each story's topic, then:
+
+- Check `projects/<ProjectName>/output/requirements_manifest.json` → `summary.context_strategy`:
+  - **`"full"`** (or missing): read the relevant portion of `requirements_context.md` (search for the `--- [filename] ---` header).
+  - **`"sectioned"`**: read the specific section file from `output/requirements_sections/` that the Source Reference points to.
+- **Read per story batch, not upfront.** Before generating AC for a batch of stories, identify the 2-3 source files relevant to those stories from the Source Reference, read them, then generate. This keeps context focused.
+- **Don't re-read files already in context.** If two stories in the same batch need the same source file, read it once.
 
 For EVERY story in the breakdown, generate:
 - `user_story`: Three-line format — "As a [role],\nI want to [action],\nSo that [benefit]."

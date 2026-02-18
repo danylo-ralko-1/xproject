@@ -21,10 +21,14 @@ This skill runs ENTIRELY in conversation. You read files, generate the breakdown
 
 ### Step 1: Read Inputs
 
-1. Read `projects/<ProjectName>/output/overview.md`
-2. Read `projects/<ProjectName>/output/requirements_context.md`
-3. Read any files in `projects/<ProjectName>/answers/` (if they exist)
+1. Read `projects/<ProjectName>/output/overview.md` — this is always the **primary source**. It contains the synthesized scope AND a **Source Reference** table at the end that maps topics to source files.
+2. Read any files in `projects/<ProjectName>/answers/` (if they exist)
    - If no answers: use reasonable defaults and mark assumptions
+3. **Targeted detail reads** — while generating the epic/feature/story structure and estimates, consult the Source Reference table in the overview whenever you need specifics the overview doesn't cover (exact field definitions, validation rules, workflow details). Then:
+   - Check `projects/<ProjectName>/output/requirements_manifest.json` → `summary.context_strategy`:
+     - **`"full"`** (or missing): read the relevant portion of `requirements_context.md` (search for the `--- [filename] ---` header).
+     - **`"sectioned"`**: read the specific section file from `output/requirements_sections/` that the Source Reference points to.
+   - **Only read what you need.** Don't read the full context or all sections — the Source Reference tells you exactly which file has the detail for each topic.
 
 ### Step 2: Generate Epic/Feature/Story Structure
 

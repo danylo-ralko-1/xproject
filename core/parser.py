@@ -29,6 +29,10 @@ IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
 ALL_SUPPORTED = TEXT_EXTS | PDF_EXTS | DOCX_EXTS | EXCEL_EXTS | CSV_EXTS | EMAIL_EXTS | IMAGE_EXTS
 
+# Context window threshold: ~150K tokens at 4 chars/token.
+# Leaves ~50K tokens for system prompts, conversation history, and working memory.
+CONTEXT_CHAR_THRESHOLD = 600_000
+
 
 @dataclass
 class ParsedFile:
@@ -362,6 +366,46 @@ def _parse_image(filepath: Path) -> ParsedFile:
         )
     except Exception as e:
         return ParsedFile(filename=filepath.name, format="image", error=str(e))
+
+
+# --- Context management helpers ---
+
+def estimate_tokens(text: str) -> int:
+    """Rough token estimate: ~4 characters per token."""
+    return len(text) // 4
+
+
+def build_sections(parsed_files: list[ParsedFile]) -> list[dict]:
+    """
+    Build per-file section metadata for large document sets.
+
+    When the combined context exceeds CONTEXT_CHAR_THRESHOLD, each file gets its
+    own numbered markdown section that can be read independently by skills.
+
+    Returns a list of dicts:
+        [{"index": 1, "filename": "001_RFP-Document.pdf.md",
+          "source": "RFP-Document.pdf", "format": "pdf",
+          "chars": 42300, "estimated_tokens": 10575, "content": "..."}]
+    """
+    sections = []
+    idx = 0
+    for pf in parsed_files:
+        if pf.error or pf.is_image or not pf.text.strip():
+            continue
+        idx += 1
+        safe_name = pf.filename.replace(" ", "-")
+        section_filename = f"{idx:03d}_{safe_name}.md"
+        content = f"# {pf.filename} ({pf.format})\n\n{pf.text.strip()}"
+        sections.append({
+            "index": idx,
+            "filename": section_filename,
+            "source": pf.filename,
+            "format": pf.format,
+            "chars": len(content),
+            "estimated_tokens": estimate_tokens(content),
+            "content": content,
+        })
+    return sections
 
 
 # --- Table formatting helpers ---

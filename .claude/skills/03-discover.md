@@ -8,8 +8,20 @@
 
 **What to do:**
 
+## Step 0: Check context strategy
+Read `output/requirements_manifest.json` and check `summary.context_strategy`:
+
+- **`"full"`** (or missing field — backwards compat): proceed to Step 1 normally, read `requirements_context.md` as a single file.
+- **`"sectioned"`**: the combined context exceeds the token window. Instead of reading `requirements_context.md` in one go:
+  1. Read the `sections` array from the manifest to get the list of section files.
+  2. Read each section file from `output/requirements_sections/` one at a time.
+  3. After reading each section, take brief notes (key topics, entities, requirements, unknowns).
+  4. After all sections are read, synthesize the notes into the overview and questions (Steps 1-2).
+
+This ensures large document sets are processed incrementally without exceeding context limits.
+
 ## Step 1: Generate overview.md
-Read `requirements_context.md` and generate a structured scope summary covering:
+Read `requirements_context.md` (if strategy is `"full"`) or use notes from section-by-section reading (if strategy is `"sectioned"`) and generate a structured scope summary covering:
 - Business problem and desired solution
 - Functional scope (grouped by feature area)
 - User roles and permissions
@@ -17,6 +29,35 @@ Read `requirements_context.md` and generate a structured scope summary covering:
 - Non-functional requirements
 - Timeline, deliverables, risks & dependencies
 - Items marked TBD or uncertain
+
+### Source Reference (MANDATORY — always append at end of overview)
+
+After the main overview content, append a `## Source Reference` section that maps **topics to source files**. This index tells downstream skills (breakdown, push) exactly which file to re-read when they need specific detail — no guessing.
+
+Build the index while reading the sources. For each file, note what kind of detail it contains. Group by topic, not by file.
+
+**Format:**
+```markdown
+## Source Reference
+
+| Topic | Detail available | Source file(s) |
+|-------|-----------------|----------------|
+| Data model — Term fields | Field names, types, max lengths, required/optional | Data-Model.xlsx, RFP.pdf (pp. 12-15) |
+| Data model — User/roles | Role names, permission matrix | Security-Spec.pdf, Transcript-Jan20.md |
+| Workflow — Term lifecycle | Draft → Review → Published states, approval rules | RFP.pdf (pp. 22-24), Client-Email-Feb3.md |
+| Authentication | SSO requirements, session behavior | Security-Spec.pdf |
+| Search & filtering | Search fields, filter options, expected behavior | Transcript-Jan20.md, RFP.pdf (p. 18) |
+| Integration — External APIs | Third-party systems, data sync requirements | Technical-Spec.docx (section 4) |
+| Non-functional | Performance targets, accessibility, browser support | RFP.pdf (pp. 30-32) |
+```
+
+**Rules for the source reference:**
+- One row per topic/sub-topic — granular enough that a developer generating AC for "Term CRUD" can find the right file in one look
+- "Detail available" column describes what specifics that file has (not a summary — a hint about what you'd find if you read it)
+- Multiple files per topic is fine — list all that contribute
+- Include page numbers or section names when known (helps with large PDFs)
+- If a topic appears in only one file, still list it — the index must be complete
+- The index covers ALL source files — every file must appear in at least one row
 
 Save to `projects/<ProjectName>/output/overview.md`.
 

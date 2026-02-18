@@ -55,6 +55,18 @@ The pipeline uses a **shared design system** (`design-system.md` at the repo roo
 
 **ADO is the single source of truth for all story data.** All downstream operations (change requests, feature code, product document) read from ADO — whether the stories were created by this pipeline or already existed. The only prerequisite is a working ADO connection with stories present. The `breakdown.json` is a temporary artifact used only when generating stories from scratch.
 
+### Context Strategy (large document sets)
+
+When a project's combined requirements exceed **600,000 characters** (~150K tokens), the ingest command automatically splits the content into per-file sections under `output/requirements_sections/`. The full `requirements_context.md` is always written for archival, but skills read sections incrementally to stay within the context window.
+
+The manifest (`requirements_manifest.json`) includes `summary.context_strategy`:
+- **`"full"`**: context fits in a single read (default, backwards-compatible).
+- **`"sectioned"`**: context is too large — discovery reads section files one at a time from `requirements_sections/`, takes notes, and synthesizes.
+
+**After discovery, `overview.md` is always the primary source** — regardless of strategy. It contains the synthesized scope plus a **Source Reference** table mapping topics to source files. Downstream skills (breakdown, push) read the overview first, then use the Source Reference to do **targeted reads** of only the specific source files needed for each story's AC — never the full 600K context again.
+
+**Zero change for small projects.** The threshold check runs silently; projects under the limit behave exactly as today.
+
 ## Conversation Behavior
 
 ### Be Proactive About Problems
