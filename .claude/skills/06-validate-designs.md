@@ -15,7 +15,7 @@ This skill uses the **screenshot-based approach**: Python fetches all screenshot
 
 ## Step 1: Gather Data (Python)
 
-Run: `python3 ~/Downloads/presales-pipeline/presales validate <ProjectName> --figma-link <url>`
+Run: `python3 ~/Downloads/xproject/xproject validate <ProjectName> --figma-link <url>`
 
 This does:
 - 1 API call to get Figma file structure (pages and frames)

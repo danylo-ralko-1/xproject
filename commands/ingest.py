@@ -13,6 +13,7 @@ from core.parser import (
     parse_directory, estimate_tokens, compute_file_hash, parsed_filename,
     ParsedFile,
 )
+from core.usage import log_operation
 
 
 def run(proj: dict) -> None:
@@ -169,12 +170,20 @@ def run(proj: dict) -> None:
                  changed=len(changed_files), removed=len(removed_files),
                  files=[pf.filename for pf in success])
 
+    # Log usage
+    log_operation(proj, "ingest", details={
+        "files_parsed": len(success),
+        "new_files": len(new_files),
+        "changed_files": len(changed_files),
+        "removed_files": len(removed_files),
+    })
+
     # Summary
     click.secho(f"\n  ✓ Requirements ingested successfully", fg="green", bold=True)
     click.echo(f"    Parsed files: {parsed_dir}/ ({len(text_files)} files, {_human_size(total_chars)})")
     click.echo(f"    Manifest: {manifest_path}")
     click.echo(f"    Hash: {req_hash}")
-    click.echo(f"\n    Next step: presales discover {project_name}")
+    click.echo(f"\n    Next step: xproject discover {project_name}")
 
 
 def _content_size(pf: ParsedFile) -> str:

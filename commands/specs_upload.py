@@ -169,7 +169,7 @@ def _load_mapping(proj: dict) -> dict | None:
     path = get_output_path(proj, "ado_mapping.json")
     if not path.exists():
         click.secho("  ✗ ado_mapping.json not found.", fg="red")
-        click.echo("    Run: presales push first to create the ADO mapping.")
+        click.echo("    Run: xproject push first to create the ADO mapping.")
         return None
     try:
         with open(path, "r", encoding="utf-8") as f:

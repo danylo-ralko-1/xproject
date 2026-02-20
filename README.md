@@ -1,6 +1,6 @@
-# PreSales Pipeline
+# xProject
 
-An AI-powered pre-sales assistant that lives in your terminal. Open Claude Code, describe what you need in plain English, and it handles requirements analysis, Azure DevOps stories, product documentation, and feature code generation for you.
+An AI-powered project assistant that lives in your terminal. Open Claude Code, describe what you need in plain English, and it handles requirements analysis, Azure DevOps stories, product documentation, and feature code generation for you.
 
 **You don't need to memorize any commands.** Just chat with Claude like you would with a colleague.
 
@@ -9,14 +9,14 @@ An AI-powered pre-sales assistant that lives in your terminal. Open Claude Code,
 Open your terminal and type:
 
 ```bash
-presales
+xproject
 ```
 
 This launches Claude Code in the pipeline folder with all instructions loaded automatically. Then just tell it what you want. Here are some real examples:
 
 ### Starting a new project
 
-> "Create a new presales project called Glossary"
+> "Create a new project called Glossary"
 
 Claude will set up the folder structure, ask for your Azure DevOps org and project name, and get everything ready. The ADO project is created with the Agile process template.
 
@@ -100,10 +100,10 @@ Claude will fetch all stories from ADO and generate wiki pages covering vision, 
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/danylo-ralko-1/presales-pipeline.git
-cd presales-pipeline
+git clone https://github.com/danylo-ralko-1/xproject.git
+cd xproject
 pip install pyyaml click openpyxl requests python-docx pdfplumber
-chmod +x presales
+chmod +x xproject
 ```
 
 ### 2. Install MCP dependencies (optional, for ADO MCP server)
@@ -112,12 +112,12 @@ chmod +x presales
 pip install -r requirements-mcp.txt
 ```
 
-### 3. Set up the `presales` alias
+### 3. Set up the `xproject` alias
 
 Add this to your `~/.zshrc` (or `~/.bashrc`):
 
 ```bash
-alias presales="cd ~/Downloads/presales-pipeline && claude"
+alias xproject="cd ~/Downloads/xproject && claude"
 ```
 
 Then reload your shell:
@@ -129,7 +129,7 @@ source ~/.zshrc
 ### 4. Start chatting
 
 ```bash
-presales
+xproject
 ```
 
 That's it. This opens Claude Code in the pipeline folder with all instructions loaded automatically. Credentials (ADO PAT) are configured per-project in `project.yaml` when you create a new project — Claude will ask you for them.
@@ -177,8 +177,8 @@ Change requests can happen at any point after push:
 ## Project Structure
 
 ```
-presales-pipeline/
-├── presales              # CLI entrypoint (used by Claude behind the scenes)
+xproject/
+├── xproject              # CLI entrypoint (used by Claude behind the scenes)
 ├── commands/             # Pipeline command implementations
 ├── core/                 # Config, ADO client, parser, context, events
 ├── ado_mcp/              # ADO MCP server for work item management
@@ -210,11 +210,11 @@ These are the Python commands that Claude runs behind the scenes. You don't need
 
 | Command | Description |
 |---------|-------------|
-| `python3 presales init <project>` | Create a new project |
-| `python3 presales ingest <project>` | Parse requirements from input/ and changes/ |
-| `python3 presales breakdown-export <project>` | Export breakdown to Excel |
-| `python3 presales push <project>` | Push stories to Azure DevOps |
-| `python3 presales status <project>` | Show project status |
-| `python3 presales list` | List all projects |
+| `python3 xproject init <project>` | Create a new project |
+| `python3 xproject ingest <project>` | Parse requirements from input/ and changes/ |
+| `python3 xproject breakdown-export <project>` | Export breakdown to Excel |
+| `python3 xproject push <project>` | Push stories to Azure DevOps |
+| `python3 xproject status <project>` | Show project status |
+| `python3 xproject list` | List all projects |
 
 </details>

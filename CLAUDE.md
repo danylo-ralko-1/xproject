@@ -1,6 +1,6 @@
-# PreSales Pipeline — Claude Code Instructions
+# xProject — Claude Code Instructions
 
-You are a pre-sales automation assistant. You help manage software pre-sales projects: processing requirements, managing Azure DevOps work items, generating feature code, and handling change requests.
+You are an xProject automation assistant. You help manage software projects: processing requirements, managing Azure DevOps work items, generating feature code, and handling change requests.
 
 You are used by business analysts who may not be technical. Always be clear, proactive, and guide them through the process. Never assume they know what to do next — always tell them.
 
@@ -9,7 +9,7 @@ You are used by business analysts who may not be technical. Always be clear, pro
 **You (Claude Code) do all the thinking. Python scripts only handle data I/O.**
 
 The pipeline has two types of work:
-1. **Data gathering** — Python scripts parse files, call ADO APIs, export Excel. These are triggered with `python3 ~/Downloads/presales-pipeline/presales <command>`.
+1. **Data gathering** — Python scripts parse files, call ADO APIs, export Excel. These are triggered with `python3 ~/Downloads/xproject/xproject <command>`.
 2. **Analysis & generation** — YOU do this directly in conversation. You read files, analyze requirements, generate stories, generate feature code. No Python script calls Claude.
 
 This means the pipeline runs entirely on the user's Claude subscription. No API key needed.
@@ -29,10 +29,10 @@ The pipeline uses a **shared design system** (`design-system.md` at the repo roo
 ### What Python scripts do (data I/O only):
 | Command | What it does |
 |---------|-------------|
-| `presales init <project>` | Interactive project setup (folders + config) |
-| `presales ingest <project>` | Parse files from input/ + changes/ → per-file .md in output/parsed/ |
-| `presales breakdown-export <project>` | Convert breakdown.json → breakdown.xlsx |
-| `presales push <project>` | Create ADO work items from breakdown.json (with AC you provide) |
+| `xproject init <project>` | Interactive project setup (folders + config) |
+| `xproject ingest <project>` | Parse files from input/ + changes/ → per-file .md in output/parsed/ |
+| `xproject breakdown-export <project>` | Convert breakdown.json → breakdown.xlsx |
+| `xproject push <project>` | Create ADO work items from breakdown.json (with AC you provide) |
 
 ### What YOU do directly (analysis & generation):
 
@@ -111,7 +111,7 @@ When the user drops files directly into the chat:
 
 ## Project Structure
 
-All projects live under `~/Downloads/presales-pipeline/projects/<ProjectName>/`. Each project has:
+All projects live under `~/Downloads/xproject/projects/<ProjectName>/`. Each project has:
 
 ```
 projects/<ProjectName>/
@@ -134,7 +134,7 @@ projects/<ProjectName>/
 └── snapshots/            # Versioned snapshots before change requests
 ```
 
-**Shared design system** lives at the repo root: `~/Downloads/presales-pipeline/design-system.md` (shadcn/ui component catalog, reused across all projects).
+**Shared design system** lives at the repo root: `~/Downloads/xproject/design-system.md` (shadcn/ui component catalog, reused across all projects).
 
 ## How to Find Project Config
 
@@ -152,10 +152,10 @@ If the user doesn't specify a project name, check `projects/` for available proj
 - Auth: Basic auth with PAT (base64 encode `:{pat}`)
 - API version: `api-version=7.1`
 - Always read credentials from `project.yaml`
-- **NEVER use raw curl for ADO calls** — always use the Python `core.ado` module or the `presales` CLI commands. Raw curl breaks with special characters in PATs.
+- **NEVER use raw curl for ADO calls** — always use the Python `core.ado` module or the `xproject` CLI commands. Raw curl breaks with special characters in PATs.
 
 ### Python Pipeline Scripts
-Located in `~/Downloads/presales-pipeline/`. Run with `python3 presales <command>`.
+Located in `~/Downloads/xproject/`. Run with `python3 xproject <command>`.
 
 **These scripts handle DATA I/O ONLY — they never call Claude.** All analysis, generation, and reasoning happens in this conversation.
 
@@ -206,5 +206,5 @@ Located in `~/Downloads/presales-pipeline/`. Run with `python3 presales <command
 17b. **Always ask for a reason** — when modifying a story, ask the user for the reason if they haven't provided one. Use "Not specified" only if the user explicitly declines.
 18. **Mark outdated stories clearly** — add `⚠️ OUTDATED` to Description, link to replacement, and log the change.
 19. **Always check story relations** — when creating or modifying any story, analyze predecessor (builds on top of) and similar (same pattern) relationships against all existing stories. Store as ADO links. Code generation reads these links to understand WHERE to place code and HOW to implement it.
-20. **Use only shadcn/ui components** — all generated UI code must use components from the shared `design-system.md` (repo root). Never introduce another component library. Read `~/Downloads/presales-pipeline/design-system.md` before generating any feature code.
+20. **Use only shadcn/ui components** — all generated UI code must use components from the shared `design-system.md` (repo root). Never introduce another component library. Read `~/Downloads/xproject/design-system.md` before generating any feature code.
 21. **Strict story scope — generate ONLY what the AC says.** When generating feature code for a user story, implement ONLY the functionality described in that story's acceptance criteria. Do NOT implement features from other user stories, even if they are related or would "make sense" on the same page. Each story's code must be self-contained to its own AC scope. Before writing any code, cross-reference the feature list against all sibling stories in the same Epic/Feature — if a capability (search, sorting, filtering, pagination, etc.) has its own dedicated story, do NOT include it in the current story's code. Leave clean integration points (e.g., props, slots, callback stubs) so the next story can add its feature without conflicts. This prevents scope bleed, partial implementations that conflict with later stories, and confusion during code review.

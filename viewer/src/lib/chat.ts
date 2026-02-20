@@ -83,7 +83,7 @@ export function suggestNextCommand(
 ): string {
   switch (category) {
     case "input":
-      return `presales ingest ${projectName}`;
+      return `xproject ingest ${projectName}`;
     case "answers":
       return `Say "create breakdown" or "update breakdown" in Claude Code`;
     case "changes":

@@ -3,7 +3,7 @@
 **Trigger:** "new project", "set up a project", "create project", "start a new project", or when there are no existing projects and the user wants to begin
 
 **What to do:**
-1. Run `python3 ~/Downloads/presales-pipeline/presales init` (or with project name if provided)
+1. Run `python3 ~/Downloads/xproject/xproject init` (or with project name if provided)
 2. This walks through an interactive setup: project name, ADO credentials, Figma token
 3. All fields have sensible defaults — the user can skip and fill in later
 4. After creation, remind: "Drop your requirement files right here in the chat, or put them in the input/ folder, then say 'ingest requirements'"

@@ -12,6 +12,6 @@
 3. Then proceed with ingestion automatically — don't make them say "ingest" separately
 
 **What to do:**
-1. Run `python3 ~/Downloads/presales-pipeline/presales ingest <ProjectName>`
+1. Run `python3 ~/Downloads/xproject/xproject ingest <ProjectName>`
 2. Report what was parsed and any errors
 3. **Next steps:** "Requirements are ingested. Next, say 'generate overview' and I'll analyze them and prepare questions for the client."

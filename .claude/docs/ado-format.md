@@ -26,7 +26,7 @@ Every time you create or modify a work item in ADO, apply **only** the appropria
 - **`Claude New Story`** / **`Claude New Feature`** / **`Claude New Epic`** — when creating a brand-new work item from scratch
 - **`Claude Modified Story`** / **`Claude Modified Feature`** / **`Claude Modified Epic`** — when updating an existing work item (e.g. enriching AC, changing title, modifying effort)
 
-**Do NOT add any other tags** (no `presales`, no project name, no epic/feature names). Only the Claude tags above.
+**Do NOT add any other tags** (no `xproject`, no project name, no epic/feature names). Only the Claude tags above.
 
 Tags are additive — preserve any existing tags on the work item. Use semicolons to separate multiple tags (e.g. `"Existing Tag; Claude Modified Story"`).
 

@@ -1,4 +1,4 @@
-"""Project configuration and state management."""
+"""Project configuration and state management for xProject pipeline."""
 
 import os
 import yaml
@@ -6,7 +6,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 
-# Base directory: projects/ lives next to the presales script
+# Base directory: projects/ lives next to the xproject script
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROJECTS_DIR = BASE_DIR / "projects"
 

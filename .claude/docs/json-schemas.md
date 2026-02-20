@@ -40,7 +40,7 @@ When generating the breakdown, output EXACTLY this structure:
 
 ## push_ready.json
 
-Before running `presales push`, generate this file with full story details:
+Before running `xproject push`, generate this file with full story details:
 ```json
 {
   "epics": [

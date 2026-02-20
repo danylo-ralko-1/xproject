@@ -1,4 +1,4 @@
-"""Lightweight event logging for the presales pipeline.
+"""Lightweight event logging for the xproject pipeline.
 
 Appends timestamped events to projects/<Name>/output/events.json.
 The viewer app reads this file to render the project timeline.

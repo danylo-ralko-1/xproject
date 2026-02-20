@@ -234,7 +234,7 @@ US-006: Filter FAQ by Category
 
 ## Phase 2: Push to ADO (Python script)
 
-Run: `python3 ~/Downloads/presales-pipeline/presales push <ProjectName>`
+Run: `python3 ~/Downloads/xproject/xproject push <ProjectName>`
 
 The script reads `push_ready.json` and creates the following hierarchy in ADO:
 - **Epics** → **Features** → **User Stories** (with the AC you generated)

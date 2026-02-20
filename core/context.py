@@ -17,10 +17,13 @@ DEPENDENCIES = {
     ],
     "enrich": [],  # Deprecated — enrichment removed from pipeline
     "validate": [
-        ("ado_pushed", "Stories not pushed to ADO. Run: presales push"),
+        ("ado_pushed", "Stories not pushed to ADO. Run: xproject push"),
     ],
     "specs-upload": [
-        ("ado_pushed", "Stories not pushed to ADO. Run: presales push"),
+        ("ado_pushed", "Stories not pushed to ADO. Run: xproject push"),
+    ],
+    "rtm": [
+        ("ado_pushed", "Stories not pushed to ADO. Run: xproject push"),
     ],
 }
 
@@ -36,6 +39,7 @@ INVALIDATION = {
     "validate": [],
     "specs-upload": [],
     "breakdown-export": [],
+    "rtm": [],
 }
 
 
@@ -55,7 +59,7 @@ def check_staleness(proj: dict) -> list[str]:
         stored_hash = state.get("requirements_hash", "")
         if current_hash and stored_hash and current_hash != stored_hash:
             warnings.append(
-                "Input files changed since last ingest. Run: presales ingest"
+                "Input files changed since last ingest. Run: xproject ingest"
             )
 
     # Check if answers exist but haven't been incorporated
@@ -63,13 +67,13 @@ def check_staleness(proj: dict) -> list[str]:
         ans_dir = get_answers_dir(proj)
         if ans_dir.exists() and any(ans_dir.iterdir()):
             warnings.append(
-                "Client answers available but breakdown not yet generated. Run: presales breakdown"
+                "Client answers available but breakdown not yet generated. Run: xproject breakdown"
             )
 
     # Check if breakdown exists but not pushed
     if state.get("breakdown_generated") and not state.get("ado_pushed"):
         warnings.append(
-            "Breakdown ready but not pushed to ADO. Run: presales push"
+            "Breakdown ready but not pushed to ADO. Run: xproject push"
         )
 
     return warnings

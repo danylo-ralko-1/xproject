@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "PreSales Pipeline",
+  title: "xProject",
   description: "Project memory and audit trail",
 };
 
@@ -21,7 +21,7 @@ export default function RootLayout({
           <header className="border-b bg-[hsl(var(--card))] px-6 py-3">
             <div className="flex items-center gap-3">
               <h1 className="text-lg font-semibold tracking-tight">
-                PreSales Pipeline
+                xProject
               </h1>
               <span className="text-xs text-[hsl(var(--muted-foreground))]">
                 Project Memory

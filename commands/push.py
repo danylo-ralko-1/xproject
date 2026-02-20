@@ -20,12 +20,15 @@ from core.config import get_output_path, update_state
 from core.context import invalidate_downstream
 from core.events import append_event
 from core import ado as ado_client
+from core.usage import log_operation
 
 
 def run(proj: dict, dry_run: bool = False) -> None:
     """Push stories to Azure DevOps from push_ready.json (or breakdown.json fallback)."""
     project_name = proj["project"]
     click.secho(f"\n  Pushing to Azure DevOps for '{project_name}'", bold=True)
+
+    ado_client.reset_call_counter()
 
     if dry_run:
         click.secho("  [DRY RUN — no changes will be made to ADO]\n", fg="yellow")
@@ -259,6 +262,15 @@ def run(proj: dict, dry_run: bool = False) -> None:
     if not dry_run:
         _attach_reference_sources(config, proj, push_data, created)
 
+    # Phase 8: Generate RTM wiki page
+    if not dry_run:
+        try:
+            from commands.rtm import run_after_push
+            run_after_push(proj, config)
+        except Exception as e:
+            click.secho(f"  ⚠ RTM wiki generation failed: {e}", fg="yellow")
+            click.echo(f"    Run manually later: xproject rtm {project_name}")
+
     # Update state
     if not dry_run:
         invalidate_downstream(proj, "push")
@@ -269,6 +281,19 @@ def run(proj: dict, dry_run: bool = False) -> None:
         append_event(proj, "pushed_to_ado",
                      stories=new_story_count, skipped=skip_count,
                      epics=total_epics, features=total_features)
+
+    # Log usage
+    if not dry_run:
+        stats = ado_client.get_call_stats()
+        log_operation(proj, "push",
+                      ado_api_calls=stats["count"],
+                      duration_seconds=stats["total_seconds"],
+                      details={
+                          "stories_created": new_story_count,
+                          "stories_skipped": skip_count,
+                          "epics": total_epics,
+                          "features": total_features,
+                      })
 
     click.secho(f"\n  ✓ Push complete", fg="green", bold=True)
     click.echo(f"    Created: {new_story_count} new stories")

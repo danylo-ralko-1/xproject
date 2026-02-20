@@ -146,7 +146,7 @@ Write the result to `projects/<ProjectName>/output/breakdown.json` in EXACTLY th
 
 ### Step 6: Export to Excel
 
-Run: `python3 ~/Downloads/presales-pipeline/presales breakdown-export <ProjectName>`
+Run: `python3 ~/Downloads/xproject/xproject breakdown-export <ProjectName>`
 
 This converts `breakdown.json` → `breakdown.xlsx` with formatting. If the command doesn't exist yet, skip this step and note it.
 

@@ -38,7 +38,7 @@ export default function HomePage() {
         <p className="text-sm text-[hsl(var(--muted-foreground))] text-center max-w-md">
           Create a project with{" "}
           <code className="px-1.5 py-0.5 rounded bg-[hsl(var(--muted))] text-xs">
-            presales init &lt;name&gt;
+            xproject init &lt;name&gt;
           </code>{" "}
           in the terminal to get started.
         </p>

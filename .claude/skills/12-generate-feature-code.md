@@ -8,7 +8,7 @@
 - Project name must be known (to read ADO credentials from project.yaml). If not: "Which project should I use? Let me check what's available."
 - ADO must be connected with stories present. If not: "I need ADO credentials configured and stories pushed before I can generate code. Want to set that up?"
 - User must provide a **Story ID** — the ADO work item number. If not: "Which user story should I generate code for? Give me the ADO ID (e.g., #752)."
-- User must provide the **target codebase path** — the actual product repo, NOT the presales pipeline. If not: "Where is your product codebase? Give me the absolute path (e.g., ~/projects/my-app)."
+- User must provide the **target codebase path** — the actual product repo, NOT the xproject pipeline. If not: "Where is your product codebase? Give me the absolute path (e.g., ~/projects/my-app)."
 - The target codebase must be a git repository. If not: "That folder isn't a git repo. Should I initialize one, or is the codebase somewhere else?"
 - Optional: **Base branch** to branch from (default: `main`).
 
@@ -35,7 +35,7 @@ Collect from the user (ask for anything missing):
 Use a Python one-liner to fetch the story with full details:
 
 ```bash
-cd ~/Downloads/presales-pipeline && python3 -c "
+cd ~/Downloads/xproject && python3 -c "
 from core.config import load_project
 from core.ado import from_project, get_work_items_by_query
 import json
@@ -670,7 +670,7 @@ If the description already has a Branch line (e.g., from a previous generation),
 Use Python one-liner with `core.ado.update_work_item` to apply both updates:
 
 ```bash
-cd ~/Downloads/presales-pipeline && python3 -c "
+cd ~/Downloads/xproject && python3 -c "
 from core.config import load_project
 from core.ado import from_project, update_work_item
 p = load_project('<ProjectName>')

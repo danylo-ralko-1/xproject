@@ -125,7 +125,7 @@ def push_new_stories_to_ado(proj: dict, stories: list[dict]) -> list[dict]:
             result = ado_client.create_work_item(
                 config, "User Story", title,
                 description=desc,
-                tags=f"presales;change-request;{cr_id};{project_name}",
+                tags=f"xproject;change-request;{cr_id};{project_name}",
                 extra_fields={
                     "Microsoft.VSTS.Scheduling.Effort": total,
                     "Microsoft.VSTS.Common.AcceptanceCriteria": ac_html,

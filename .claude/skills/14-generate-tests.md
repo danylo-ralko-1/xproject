@@ -26,7 +26,7 @@ Collect from the user (ask for anything missing):
 Fetch the story with full details (same as skill 12, Step 2):
 
 ```bash
-cd ~/Downloads/presales-pipeline && python3 -c "
+cd ~/Downloads/xproject && python3 -c "
 from core.config import load_project
 from core.ado import from_project, get_work_items_by_query
 import json

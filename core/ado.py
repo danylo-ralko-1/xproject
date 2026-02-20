@@ -15,6 +15,22 @@ logger = logging.getLogger(__name__)
 ADO_API_VERSION = "7.1"
 RATE_LIMIT_DELAY = 0.3  # seconds between API calls to avoid throttling
 
+# Module-level API call counter for usage tracking
+_call_count = 0
+_call_total_seconds = 0.0
+
+
+def reset_call_counter() -> None:
+    """Reset the API call counter and timer to zero."""
+    global _call_count, _call_total_seconds
+    _call_count = 0
+    _call_total_seconds = 0.0
+
+
+def get_call_stats() -> dict:
+    """Return current API call count and total elapsed seconds."""
+    return {"count": _call_count, "total_seconds": round(_call_total_seconds, 2)}
+
 
 @dataclass
 class AdoConfig:
@@ -674,6 +690,96 @@ def upsert_wiki_page(
         )
 
 
+def create_project_wiki(config: AdoConfig) -> dict:
+    """
+    Create a project wiki in the ADO project.
+
+    Only needed when no wiki exists yet. Creates a wiki of type 'projectWiki'.
+
+    Returns:
+        Wiki metadata dict from ADO API (id, name, type, etc.)
+    """
+    proj = urllib.parse.quote(config.project, safe="")
+    url = (
+        f"https://dev.azure.com/{config.organization}/{proj}"
+        f"/_apis/wiki/wikis?api-version={ADO_API_VERSION}"
+    )
+
+    # Fetch the project ID needed for the wiki creation payload
+    project_url = (
+        f"https://dev.azure.com/{config.organization}/_apis/projects/"
+        f"{proj}?api-version={ADO_API_VERSION}"
+    )
+    project_info = _api_request(config, project_url, method="GET")
+    project_id = project_info.get("id", "")
+
+    body = {
+        "type": "projectWiki",
+        "name": f"{config.project}.wiki",
+        "projectId": project_id,
+    }
+    return _api_request(config, url, method="POST", body=body)
+
+
+def upload_wiki_attachment(
+    config: AdoConfig,
+    wiki_id: str,
+    file_path: str,
+    filename: str | None = None,
+) -> str:
+    """
+    Upload a file attachment to an ADO wiki.
+
+    ADO wiki attachments require the file content to be base64-encoded
+    and sent as application/octet-stream.
+
+    Args:
+        config: ADO connection config
+        wiki_id: Wiki identifier (name or ID)
+        file_path: Local path to the file to upload
+        filename: Display name (defaults to basename of file_path)
+
+    Returns:
+        The wiki-relative path to the attachment (for use in markdown links)
+    """
+    from pathlib import Path as _Path
+    fp = _Path(file_path)
+    if not fp.exists():
+        raise FileNotFoundError(f"Attachment file not found: {file_path}")
+
+    if not filename:
+        filename = fp.name
+
+    proj = urllib.parse.quote(config.project, safe="")
+    encoded_wiki = urllib.parse.quote(wiki_id, safe="")
+    encoded_name = urllib.parse.quote(filename, safe="")
+    url = (
+        f"https://dev.azure.com/{config.organization}/{proj}"
+        f"/_apis/wiki/wikis/{encoded_wiki}/attachments?name={encoded_name}"
+        f"&api-version={ADO_API_VERSION}"
+    )
+
+    default_path = f"/.attachments/{filename}"
+
+    file_data = base64.b64encode(fp.read_bytes())
+    headers = {
+        "Authorization": config.auth_header,
+        "Content-Type": "application/octet-stream",
+    }
+    req = urllib.request.Request(url, data=file_data, headers=headers, method="PUT")
+
+    try:
+        time.sleep(RATE_LIMIT_DELAY)
+        with urllib.request.urlopen(req) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+        return result.get("path", default_path)
+    except urllib.error.HTTPError as e:
+        # 500 with "already exists" or 409 Conflict — attachment was uploaded before
+        if e.code in (409, 500):
+            return default_path
+        raise
+
+
 def list_repositories(config: AdoConfig) -> list[dict]:
     """
     List all Git repositories in the ADO project.
@@ -711,12 +817,17 @@ def _api_request(
 
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
 
+    global _call_count, _call_total_seconds
+
     retries = 3
     for attempt in range(retries):
         try:
             time.sleep(RATE_LIMIT_DELAY)
+            t0 = time.monotonic()
             with urllib.request.urlopen(req) as resp:
                 resp_body = resp.read().decode("utf-8")
+                _call_total_seconds += time.monotonic() - t0
+                _call_count += 1
                 return json.loads(resp_body) if resp_body else {}
         except urllib.error.HTTPError as e:
             body_text = ""
