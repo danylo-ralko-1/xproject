@@ -227,7 +227,7 @@ def specs_upload(project_name):
 @cli.command()
 @click.argument("project_name")
 def usage(project_name):
-    """Show pipeline usage and estimated cost for a project."""
+    """Show pipeline operation log (ADO calls, script runs)."""
     proj = _load_or_exit(project_name)
     if not proj:
         return
@@ -237,46 +237,125 @@ def usage(project_name):
     summary = get_usage_summary(proj)
 
     if summary["total_operations"] == 0:
-        click.secho(f"\n  No usage data for '{project_name}' yet.", fg="yellow")
-        click.echo("  Usage is logged automatically when running pipeline commands.")
+        click.secho(f"\n  No pipeline operation data for '{project_name}' yet.", fg="yellow")
+        click.echo("  Operations are logged when running pipeline commands (push, ingest, etc.).")
         return
 
-    click.secho(f"\n  Pipeline Usage for '{project_name}'", bold=True)
+    click.secho(f"\n  Pipeline Operations for '{project_name}'", bold=True)
     click.echo("")
     click.echo(f"  Total operations:     {summary['total_operations']}")
     click.echo(f"  Total ADO API calls:  {summary['total_ado_api_calls']}")
-    click.echo(f"  Total estimated cost: ${summary['total_estimated_cost_usd']:.2f}")
     click.echo("")
 
-    # Breakdown by operation
     by_op = summary["by_operation"]
     if by_op:
         click.secho("  Breakdown by operation:", bold=True)
-        total_cost = summary["total_estimated_cost_usd"] or 1  # avoid div-by-zero
-
         for op, info in sorted(by_op.items()):
             runs_label = "run" if info["runs"] == 1 else "runs"
-            pct = (info["cost"] / total_cost * 100) if total_cost > 0 else 0
-            line = f"    {op:20s} {info['runs']:>2} {runs_label:<4s}  ${info['cost']:>7.2f}"
-            if info["cost"] > 0:
-                line += f"   ({pct:.0f}%)"
+            line = f"    {op:20s} {info['runs']:>2} {runs_label}"
             if info["ado_calls"] > 0:
-                line += f"   {info['ado_calls']} API calls"
+                line += f"   ({info['ado_calls']} API calls)"
             click.echo(line)
 
-    # Timeline
+
+@cli.command()
+@click.argument("project_name")
+@click.option("--log", "do_log", is_flag=True, help="Log a cost entry (interactive)")
+@click.option("--scan", is_flag=True, help="Show all Claude Code sessions for this workspace")
+def cost(project_name, do_log, scan):
+    """Show cumulative AI cost for a project.
+
+    Tracks Claude token costs across sessions. Entries are added by Claude
+    during conversation or manually via --log.
+
+    Use --scan to see all Claude Code sessions for this workspace (not
+    project-specific — sessions are logged to projects by Claude or manually).
+    """
+    proj = _load_or_exit(project_name)
+    if not proj:
+        return
+
+    from core.cost import get_cost_summary, log_session, read_all_sessions_for_cwd
+
+    if scan:
+        _scan_sessions(read_all_sessions_for_cwd)
+        return
+
+    if do_log:
+        _interactive_log(proj, log_session)
+        return
+
+    # Show summary
+    summary = get_cost_summary(proj)
+
+    if summary["total_sessions"] == 0:
+        click.secho(f"\n  No cost data for '{project_name}' yet.", fg="yellow")
+        click.echo("  Cost is logged by Claude during conversation, or use:")
+        click.echo(f"    xproject cost {project_name} --log    (add entry manually)")
+        click.echo(f"    xproject cost {project_name} --scan   (view all workspace sessions)")
+        return
+
+    click.secho(f"\n  AI Cost Summary for '{project_name}'", bold=True)
     click.echo("")
-    first = summary["first_operation"]
-    last = summary["last_operation"]
-    if first and last:
-        # Parse and format nicely
-        try:
-            from datetime import datetime
-            f_dt = datetime.fromisoformat(first.replace("Z", "+00:00"))
-            l_dt = datetime.fromisoformat(last.replace("Z", "+00:00"))
-            click.echo(f"  Timeline: {f_dt.strftime('%b %d, %Y')} -> {l_dt.strftime('%b %d, %Y')}")
-        except (ValueError, TypeError):
-            click.echo(f"  Timeline: {first} -> {last}")
+    click.secho(f"  Total cost:     ${summary['total_cost_usd']:.2f}", fg="cyan", bold=True)
+    click.echo(f"  Total tokens:   {summary['total_tokens']:,}")
+    click.echo(f"  Sessions:       {summary['total_sessions']}")
+    if summary["first_date"] and summary["last_date"]:
+        click.echo(f"  Period:         {summary['first_date']} → {summary['last_date']}")
+
+    click.echo("")
+    click.secho("  Session log:", bold=True)
+    for e in summary["entries"]:
+        date = e.get("date", "?")
+        cost_val = e.get("cost_usd", 0)
+        desc = e.get("description", "")[:60]
+        tokens = e.get("tokens", 0)
+        tok_str = f"  ({tokens:,} tokens)" if tokens else ""
+        click.echo(f"    {date}  ${cost_val:>7.2f}{tok_str}  {desc}")
+
+    click.echo("")
+    click.echo(f"  Tip: Compare against manual effort cost to measure AI ROI.")
+
+
+def _scan_sessions(read_all_fn):
+    """Show all Claude Code sessions for this workspace (informational)."""
+    click.echo("\n  Scanning Claude Code transcripts for this workspace...")
+    sessions = read_all_fn()
+
+    if not sessions:
+        click.secho("  No sessions found.", fg="yellow")
+        return
+
+    # Sort by date
+    sessions.sort(key=lambda s: s.get("first_activity") or "")
+
+    click.echo(f"  Found {len(sessions)} session(s):\n")
+    for s in sessions:
+        first = (s.get("first_activity") or "?")[:10]
+        last = (s.get("last_activity") or "?")[:10]
+        models = ", ".join(s.get("models_used", []))
+        date_str = first if first == last else f"{first}→{last}"
+        click.echo(
+            f"    ${s['total_cost_usd']:>7.2f}  "
+            f"{s['total_tokens']:>12,} tokens  "
+            f"{date_str}  "
+            f"({models})"
+        )
+
+    total = sum(s["total_cost_usd"] for s in sessions)
+    click.echo(f"\n  Total (all sessions): ${total:.2f}")
+    click.echo("\n  Note: These are ALL sessions in this workspace, not project-specific.")
+    click.echo("  Claude logs project-specific costs during conversation.")
+
+
+def _interactive_log(proj, log_fn):
+    """Manually log a cost entry."""
+    cost_val = click.prompt("  Cost (USD)", type=float)
+    desc = click.prompt("  Description", default="Manual entry")
+    tokens = click.prompt("  Tokens (0 if unknown)", type=int, default=0)
+
+    log_fn(proj, cost_usd=cost_val, description=desc, tokens=tokens)
+    click.secho("  ✓ Entry logged", fg="green")
 
 
 # --- Helpers ---
