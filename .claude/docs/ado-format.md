@@ -160,14 +160,101 @@ When creating a User Story, **always** create discipline tasks as children:
 - **Backend:** Title = `[BE] <User Story Title>`, Effort = be_days — create if the story has any backend work (API, database, integrations, server-side logic)
 - **DevOps:** Title = `[DevOps] <User Story Title>`, Effort = devops_days — create only if explicit DevOps work is needed
 - **Design tasks are NOT created**
-- **QA Test Design:** Title = `[QA][TD] <User Story Title>`, no effort, no description — placeholder for QA planning
-- **QA Test Execution:** Title = `[QA][TE] <User Story Title>`, no effort, no description — placeholder for QA execution
+- **QA Test Design:** Title = `[QA][TD] <User Story Title>`, no effort — Description contains **manual test cases** derived from the story's AC (see format below)
+- **QA Test Execution:** Title = `[QA][TE] <User Story Title>`, no effort, no description — time-tracking placeholder for QA execution
 
 Link each Task to its parent User Story via `System.LinkTypes.Hierarchy-Reverse`.
 
 **QA tasks are only created for testable stories** — stories with user-facing functionality, business logic changes, or behavioral changes that a QA specialist can verify. They are **skipped** for purely technical stories that have no end-user impact (e.g., environment setup, CI/CD pipeline, database migrations). Claude sets `skip_qa: true` on such stories during generation; the push script reads this flag.
 
 If effort values are not yet assigned, still create the tasks (with effort = 0) so the hierarchy is complete. Effort can be updated later during estimation.
+
+### QA Test Design Description Format
+
+The `[QA][TD]` task Description field contains manual test cases derived from the parent story's AC. Claude generates these when creating the story — QA can start testing immediately.
+
+**HTML structure:**
+```html
+<b>Preconditions:</b>
+<ul>
+  <li>[Shared precondition — user role, existing data, system state]</li>
+</ul>
+
+<b>Test Data:</b>
+<ul>
+  <li>[Specific values to use in tests — names, emails, boundary strings]</li>
+</ul>
+
+<b>Environment:</b> [Browser requirements, viewport sizes if responsive testing needed]
+<br><br>
+
+<hr>
+<h4>AC 1: [AC Group Title]</h4>
+
+<b>TC-001: [Descriptive test case title]</b> [P1]
+<br><i>[Type] — [One-line description]</i>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse; width:100%;">
+  <tr style="background-color:#f0f0f0;">
+    <th style="width:5%;">#</th>
+    <th style="width:50%;">Step</th>
+    <th style="width:45%;">Expected Result</th>
+  </tr>
+  <tr>
+    <td>1</td>
+    <td>[Action the tester performs]</td>
+    <td>[What they should observe — specific text, values, behavior]</td>
+  </tr>
+</table>
+```
+
+**Rules for generating test cases:**
+
+- **Group by AC** — test cases under `<h4>AC N: Title</h4>` headings, plus a "Cross-Cutting" section at the end for implicit tests
+- **Numbering:** `TC-001` through `TC-NNN`, sequential within the task
+- **Priority tags:** `[P1]` must test (happy path + key negative), `[P2]` should test (edge/boundary), `[P3]` nice to test (a11y, polish)
+- **Type labels:** Happy path, Negative, Edge case, Boundary, Authorization, Implicit
+- **Per AC bullet, generate:**
+  - 1 happy path test (always)
+  - 1 negative test (always for user inputs, API calls, conditional logic)
+  - 0-1 boundary test (when limits/ranges are mentioned in AC)
+  - 0-1 edge case (empty states, cancel flows)
+- **No cross-cutting / implicit tests** — do not add generic tests for page load, keyboard accessibility, or similar. Only generate test cases directly derived from the story's AC bullets
+- **Detail level:** describe WHAT to interact with and WHAT data to enter — not HOW to operate a mouse. A QA engineer knows how to click; they need to know *which* element and *what value*
+- **Expected results must be observable and specific** — exact message text, exact values, exact UI state. Never "it works correctly"
+- **Test data must be explicit** — "enter `test@example.com`", not "enter a valid email"
+- **Preconditions:** shared at top, TC-specific only when a TC needs additional setup
+- **Typical count:** 15-30 test cases per story (2-4 per AC bullet)
+
+### QA Test Design Modification Rules
+
+When a user story's AC changes (via change request or direct modification), the `[QA][TD]` task Description **must also be updated** to reflect the changes. Follow the same modification rules as user stories:
+
+1. **Never delete outdated test cases.** Mark them with red strikethrough:
+```html
+<span style="color:red;text-decoration:line-through"><b>TC-005: Verify "All" button clears letter filter</b> [P1]
+<br><i>Happy path — verifies All option</i>
+<table>...</table></span>
+```
+
+2. **Add new or replacement test cases in green:**
+```html
+<span style="color:green"><b>TC-016: Verify clicking active letter clears the filter</b> [P1]
+<br><i>Happy path — replaces TC-005 (All button removed per CR #1553)</i>
+<table>...</table></span>
+```
+
+3. **For modified steps within an existing test case**, apply red/green inline to the changed step or expected result — don't strikethrough the entire TC if only one step changed:
+```html
+<tr>
+<td>2</td>
+<td><span style="color:red;text-decoration:line-through">Click the "All" button</span> <span style="color:green">Click the active letter "B" again</span></td>
+<td><span style="color:red;text-decoration:line-through">All terms are shown, no letter is highlighted</span> <span style="color:green">Filter is cleared, "B" returns to default style, all terms shown</span></td>
+</tr>
+```
+
+4. **New test cases** added due to AC changes get the next sequential number (TC-016, TC-017, etc.) — never reuse numbers from struck-through test cases.
+
+5. **Update preconditions and test data** if the AC change affects them (e.g., new role, new field, removed feature). Apply red/green markup to changed items.
 
 ## Story Relations (MANDATORY)
 

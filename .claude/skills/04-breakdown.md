@@ -48,7 +48,7 @@ Analyze the requirements, overview, and client answers. Generate the hierarchy:
 For each story, determine:
 - `title`: clear, descriptive story title
 - `acceptance_criteria`: brief scope-level AC (1-2 sentences — detailed AC is generated in push_ready.json)
-- `skip_qa`: `true` if the story is purely technical with no end-user impact (e.g., environment setup, CI/CD, database migration, infrastructure changes). `false` (default) for anything a QA specialist can test — new functionality, business logic, UI changes, behavioral changes. When `false`, the push script creates `[QA][TD]` and `[QA][TE]` placeholder tasks.
+- `skip_qa`: `true` if the story is purely technical with no end-user impact (e.g., environment setup, CI/CD, database migration, infrastructure changes). `false` (default) for anything a QA specialist can test — new functionality, business logic, UI changes, behavioral changes. When `false`, the push script creates `[QA][TD]` (with manual test cases in Description) and `[QA][TE]` (time-tracking placeholder) tasks.
 - `fe_days`: frontend effort in days
 - `be_days`: backend effort in days
 - `devops_days`: DevOps effort in days (0 for most stories)

@@ -397,16 +397,29 @@ def _create_tasks(config, project_name: str, parent_id: int,
     # QA tasks — only for testable stories (skip_qa flag set by Claude
     # during story generation for purely technical stories with no end-user impact)
     if not story.get("skip_qa", False):
-        for qa_suffix in ("[QA][TD]", "[QA][TE]"):
-            task_title = f"{qa_suffix} {story_title}"
-            try:
-                ado_client.create_work_item(
-                    config, "Task", task_title,
-                    parent_id=parent_id,
-                    tags="Claude New Story",
-                )
-            except Exception as e:
-                click.secho(f"          ⚠ Failed to create {qa_suffix} task: {e}", fg="yellow")
+        # [QA][TD] — Test Design with manual test cases in description
+        td_title = f"[QA][TD] {story_title}"
+        td_description = story.get("qa_td_description", "")
+        try:
+            ado_client.create_work_item(
+                config, "Task", td_title,
+                parent_id=parent_id,
+                description=td_description,
+                tags="Claude New Story",
+            )
+        except Exception as e:
+            click.secho(f"          ⚠ Failed to create [QA][TD] task: {e}", fg="yellow")
+
+        # [QA][TE] — Test Execution time-tracking placeholder (no description)
+        te_title = f"[QA][TE] {story_title}"
+        try:
+            ado_client.create_work_item(
+                config, "Task", te_title,
+                parent_id=parent_id,
+                tags="Claude New Story",
+            )
+        except Exception as e:
+            click.secho(f"          ⚠ Failed to create [QA][TE] task: {e}", fg="yellow")
 
 
 def _create_relation_links(config, push_data: dict, created: dict) -> None:

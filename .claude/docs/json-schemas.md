@@ -105,6 +105,7 @@ Before running `xproject push`, generate this file with full story details:
               ],
               "predecessors": ["US-003"],
               "similar_stories": ["US-007"],
+              "qa_td_description": "<b>Preconditions:</b><ul><li>User logged in as admin</li></ul><b>Test Data:</b><ul><li>...</li></ul><b>Environment:</b> Chrome 120+<br><br><hr><h4>AC 1: Search behavior</h4><b>TC-001: Verify search filters results</b> [P1]<br><i>Happy path</i><table border=\"1\" cellpadding=\"6\" cellspacing=\"0\" style=\"border-collapse:collapse; width:100%;\"><tr style=\"background-color:#f0f0f0;\"><th style=\"width:5%;\">#</th><th style=\"width:50%;\">Step</th><th style=\"width:45%;\">Expected Result</th></tr><tr><td>1</td><td>Type 'Term' in search field</td><td>Table filters to show only matching terms</td></tr></table>",
               "skip_qa": false,
               "fe_days": 2,
               "be_days": 3,

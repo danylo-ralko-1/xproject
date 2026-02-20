@@ -102,7 +102,7 @@ If stories are pushed to ADO (`state.ado_pushed: true`):
 Use `core.ado` to create work items in ADO:
 - Create User Story with description (user story text only), AC (no Change Log on creation), effort
 - Tags: `Claude New Story` (no other tags)
-- Create discipline Tasks as children (FE/BE/DevOps where effort > 0, plus [QA][TD] and [QA][TE] placeholders for testable stories)
+- Create discipline Tasks as children (FE/BE/DevOps where effort > 0, plus [QA][TD] with manual test cases in Description and [QA][TE] time-tracking placeholder for testable stories)
 - Link to appropriate Feature parent
 - **Analyze relations** — for each new story, check ALL existing stories in ADO for:
   - **Predecessors:** Does this new story build on top of an existing story's output? If so, add a `System.LinkTypes.Dependency-Reverse` link.
@@ -128,6 +128,7 @@ Update existing ADO items following the **Modification Rules**:
   ```
 - **Ask the user for a reason** if they haven't provided one. Use "Not specified" only if they explicitly decline.
 - Add tag `Claude Modified Story` (preserve existing tags)
+- **Update the `[QA][TD]` child task** — find the `[QA][TD]` task under the modified story and update its Description following the QA Test Design Modification Rules in `.claude/docs/ado-format.md`. Strikethrough outdated test cases in red, add new/replacement test cases in green. For minor step changes, apply red/green inline within the affected rows.
 
 ### Outdated stories
 If a change request makes an existing story irrelevant:

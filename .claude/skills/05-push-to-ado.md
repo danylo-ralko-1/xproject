@@ -232,6 +232,30 @@ US-006: Filter FAQ by Category
 
 **WAIT for approval before writing the relations into push_ready.json.**
 
+## Phase 1c: Generate QA Test Design Descriptions (YOU do this)
+
+For each story that has `skip_qa: false`, generate a `qa_td_description` field containing manual test cases in HTML format. These go into the `[QA][TD]` task's Description field so QA can start testing immediately.
+
+**Read `.claude/docs/ado-format.md` section "QA Test Design Description Format"** for the exact HTML structure and rules.
+
+**Derivation process per story:**
+1. Read the story's `acceptance_criteria` array — each AC group becomes a test case section
+2. For each AC bullet, generate:
+   - 1 happy path test case `[P1]` (always)
+   - 1 negative test case `[P1]` (for inputs, API calls, conditional logic)
+   - 0-1 boundary test `[P2]` (when limits/ranges mentioned)
+   - 0-1 edge case `[P2]` (empty states, cancel flows)
+3. Read the `technical_context` to derive:
+   - **Preconditions** from data model (what data must exist)
+   - **Test data** with specific values matching the data model types/constraints
+   - **State-based tests** from the states section (loading, empty, error)
+4. Add implicit cross-cutting tests at the end: page load, empty state, cancel/back, error recovery, keyboard accessibility
+5. Number all test cases sequentially: `TC-001` through `TC-NNN`
+
+**Write the HTML string into each story's `qa_td_description` field in push_ready.json.** The push script reads this field and passes it as the Description when creating the `[QA][TD]` task.
+
+Stories with `skip_qa: true` do not get this field (no QA tasks created).
+
 ## Phase 2: Push to ADO (Python script)
 
 Run: `python3 ~/Downloads/xproject/xproject push <ProjectName>`
@@ -242,8 +266,8 @@ The script reads `push_ready.json` and creates the following hierarchy in ADO:
   - `[FE] <Story Title>` — if the story has frontend effort > 0
   - `[BE] <Story Title>` — if the story has backend effort > 0
   - `[DevOps] <Story Title>` — if the story has DevOps effort > 0
-  - `[QA][TD] <Story Title>` — Test Design placeholder (no effort, no description)
-  - `[QA][TE] <Story Title>` — Test Execution placeholder (no effort, no description)
+  - `[QA][TD] <Story Title>` — Test Design with manual test cases in Description (derived from AC, see `.claude/docs/ado-format.md` for format)
+  - `[QA][TE] <Story Title>` — Test Execution time-tracking placeholder (no effort, no description)
   - QA tasks are skipped when the story has `skip_qa: true` (set by Claude for purely technical stories with no end-user impact)
   - Design tasks are NOT created
 - **Story relation links** — after all stories are created, the script reads `predecessors` and `similar_stories` arrays, maps local IDs to ADO IDs, and creates:
